@@ -45,7 +45,7 @@ unmatched <- place %>%
   left_join(pl2co[c("pl_label", "st_name", "stco_fips", "afact1")], by = c("pl_label", "st_name")) %>%
   filter(is.na(stco_fips))
 
-# Geocode unmatched use geocoding api 
+# Geocode unmatched use geocoding api
 KEY <- Sys.getenv("GOOGLE_MAP_KEY")
 
 for (i in 1:nrow(unmatched)) {
@@ -81,14 +81,14 @@ df <- df %>%
 # To do
 # () apply afact
 # () apply threshold for technologies
-# 
+#
 
 cb_city <- unnest_tokens(df, out, Categories, token = "regex", pattern = ",") %>%
   mutate(out = trimws(out)) %>%
   # group_by(out) %>%
   # mutate(count = n()) %>%
   # filter(count > 5) %>%
-  
+
   # calculate LQ for each msa-tech pair
   group_by(cbsa_code, cbsa_name, out) %>%
   count(out, sort = TRUE) %>%
@@ -100,45 +100,90 @@ cb_city <- unnest_tokens(df, out, Categories, token = "regex", pattern = ",") %>
   group_by(cbsa_code, cbsa_name) %>%
   mutate(share_city = n / sum(n)) %>%
   mutate(lq = share_city / share_us) %>%
-  
   arrange(-lq) %>%
   ungroup()
 
 # complexicty -------------------------
 
-tmp <- cb_city %>%
-  
+nw_city_tech <- cb_city %>%
+
   # a place has Relative Technological Advantage (RTA) when LQ > 1
   filter(lq > 1) %>%
-  mutate(RTA = 1) %>%
-  select(
-    cbsa_name, cbsa_code,
-    out, RTA
-  ) %>%
   
-  # calculate diversity
-  group_by(cbsa_name, cbsa_code) %>%
-  mutate(diversity = n()) %>%
-  
-  # calculate ubiquity
-  group_by(out) %>%
-  mutate(ubiquity = n()) %>%
-  
-  # calculate mean ubiquity for each msa
-  ungroup() %>%
-  group_by(cbsa_name, cbsa_code) %>%
-  summarise(
-    mean_ubi = mean(ubiquity),
-    diversity = mean(diversity)
-  ) %>%
-  
+  select(cbsa_name, cbsa_code,out, lq) %>% 
   # only show top 100 metros
-  filter(cbsa_code %in% get_code_cbsa100())
+  filter(cbsa_code %in% get_code_cbsa100())%>%
+  
+  # calculate ubiquity --------
+  group_by(out) %>%
+  mutate(ubi = n())%>%
+    # remove technologies in which less than 10 cities had a RTA
+  filter(ubi > 10) %>%
+  
+  # calculate diversity -------
+  group_by(cbsa_name, cbsa_code) %>%
+  mutate(div = n()) %>%
 
+
+  ungroup()
+
+# Iterate 20 times to calculateKCI ----------------------------------------
+for (i in 20) {
+  df <- nw_city_tech %>%
+    group_by(out)%>%
+    mutate(ubi = sum(div)/ubi)%>%
+    ungroup()%>%
+    group_by(cbsa_name,cbsa_code)%>%
+    mutate(div = sum(ubi)/div)%>%
+    ungroup()
+  return(df)
+}
+
+t <- df%>%
+  group_by(cbsa_code,cbsa_name)%>%
+  mutate(KCI = sum(ubi)/div)%>%
+  select(cbsa_code, cbsa_name,KCI)%>%
+  unique()%>%
+  arrange(KCI)
+
+# save result
+KCI <- nw_city_tech %>% left_join(t,by = "cbsa_code")%>%
+  arrange(-KCI)
+write.csv(KCI, "cbsa100_KCI.csv")
 
 # Visualize -----------------------------------
-# plot(tmp$diversity, tmp$mean_ubi)
 
-p <- ggplot(tmp, aes(x = diversity, y = mean_ubi, label = cbsa_name)) + geom_point(stat = "identity")
+p <- ggplot(nw_city_tech %>%
+              group_by(cbsa_code,cbsa_name,div)%>%
+              summarise(mean_ubi = sum(ubi/div)), 
+            aes(x = div, y = mean_ubi, label = cbsa_name)) + geom_point(stat = "identity")
 
 ggplotly(p)
+
+
+# Network -------------------------------------
+
+# https://www.jessesadler.com/post/network-analysis-with-r/
+
+
+nodes <- bind_rows(
+  nw_city_tech%>%
+    select(nodes = cbsa_name)%>%unique()%>%
+    mutate(color.background = "yellow"),
+  nw_city_tech%>%
+    select(nodes = out)%>%unique()%>%
+    mutate(color.background = "blue")
+  )%>%
+  rowid_to_column("id")
+
+edges <- nw_city_tech %>%
+  # filter(diversity>100)%>%
+  left_join(nodes, by = c("cbsa_name" = "nodes")) %>%
+  rename(msa = id) %>%
+  left_join(nodes, by = c("out" = "nodes")) %>%
+  rename(tech = id) %>%
+  select(msa, tech, value = diversity, width = ubiquity)
+
+library(visNetwork)
+
+visNetwork::visNetwork(nodes,edges)
