@@ -36,6 +36,9 @@ place <- df %>%
   )) %>%
   unique()
 
+# t <- place %>% left_join(pl2fips[c("pl_label", "st_name", "stco_fips", "afact1")], by = c("pl_label", "st_name")) %>%
+#   filter(!is.na(stco_fips))
+
 # match place with place2county xwalk
 matched <- place %>%
   left_join(pl2co[c("pl_label", "st_name", "stco_fips", "afact1")], by = c("pl_label", "st_name")) %>%
@@ -127,10 +130,13 @@ nw_city_tech <- cb_city %>%
 
   ungroup()
 
+nw_city_tech <- read.csv("cbsa100_KCI.csv") %>%
+  select(-KCI)
+
 # Iterate 20 times to calculateKCI ----------------------------------------
-for (i in 20) {
+for (i in 80) {
   df <- nw_city_tech %>%
-    group_by(out)%>%
+    group_by(categories)%>%
     mutate(ubi = sum(div)/ubi)%>%
     ungroup()%>%
     group_by(cbsa_name,cbsa_code)%>%
@@ -139,17 +145,21 @@ for (i in 20) {
   return(df)
 }
 
-t <- df%>%
-  group_by(cbsa_code,cbsa_name)%>%
-  mutate(KCI = sum(ubi)/div)%>%
-  select(cbsa_code, cbsa_name,KCI)%>%
-  unique()%>%
-  arrange(KCI)
+KCI <- df%>%
+  select(cbsa_code, cbsa_name,KCI=div)%>%
+  unique()
+
+TCI<- df%>%
+  select(categories,TCI=ubi)%>%
+  unique()
 
 # save result
-KCI <- nw_city_tech %>% left_join(t,by = "cbsa_code")%>%
+cbsa_TCI_KCI <- nw_city_tech %>% 
+  left_join(KCI,by = c("cbsa_code","cbsa_name"))%>%
+  left_join(TCI, by = "categories")%>%
   arrange(-KCI)
-write.csv(KCI, "cbsa100_KCI.csv")
+  
+write.csv(cbsa_TCI_KCI, "cbsa100_KCI.csv")
 
 # Visualize -----------------------------------
 
