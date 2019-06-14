@@ -11,6 +11,10 @@ key <- Sys.getenv("CRUNCHBASE_KEY")
 query <- "https://api.crunchbase.com/v3.1/organizations?user_key="
 query <- "https://api.crunchbase.com/v3.1/organizations/facebook?relationships=funding_rounds,investors&user_key="
 
+query <- "https://api.crunchbase.com/v3.1/organizations/facebook?relationships=funding_rounds,investors&user_key="
+
+
+
 # temp <- GET(paste0(query, key))
 df <- fromJSON(paste0(query,key))
 
