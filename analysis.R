@@ -4,7 +4,7 @@
 # use crunchbase categories to calcultae startup complexity index
 
 # SETUP ================================
-pkgs <- c("tidyverse", "tidytext", "SifanLiu", "network", "metro.data", "plotly")
+pkgs <- c("tidyverse", "tidytext", "SifanLiu", "metro.data")
 
 check <- sapply(pkgs, require, warn.conflicts = TRUE, character.only = TRUE)
 if (any(!check)) {
@@ -13,17 +13,20 @@ if (any(!check)) {
   check <- sapply(pkgs.missing, require, warn.conflicts = TRUE, character.only = TRUE)
 }
 
-# read data ===============================
+# if not installed, install from githubs
+devtools::install_github("fansi-sifan/SifanLiu")
+# devtools::install_github("BrookingsInstitution/metro-data-warehouse")
 
-cb_all <- read_all("../Datasets/innovation/crunchbase/data")
-# select active companies only
-df <- cb_all %>%
-  filter(Operating.Status == "Active")
+# read data ===============================
+# cb_all <- SifanLiu::read_all("../Datasets/innovation/crunchbase/data")
+# skimr::skim(cb_all)
+# save(cb_all, file = "data/cb_all.rda")
+load("data/cb_all.rda")
 
 # match place to msa ----------------------
 
 # get a unique place list
-place <- df %>%
+place <- cb_all %>%
   select(Headquarters.Location) %>%
   separate(Headquarters.Location, c("pl_name", "st_name", "US"), sep = ",", remove = F) %>%
   mutate(
@@ -39,72 +42,83 @@ place <- df %>%
 # t <- place %>% left_join(pl2fips[c("pl_label", "st_name", "stco_fips", "afact1")], by = c("pl_label", "st_name")) %>%
 #   filter(!is.na(stco_fips))
 
-# match place with place2county xwalk
-matched <- place %>%
-  left_join(pl2co[c("pl_label", "st_name", "stco_fips", "afact1")], by = c("pl_label", "st_name")) %>%
-  filter(!is.na(stco_fips))
+# GEOCODE ----------------------
+# source("geocode.R")
 
-unmatched <- place %>%
-  left_join(pl2co[c("pl_label", "st_name", "stco_fips", "afact1")], by = c("pl_label", "st_name")) %>%
-  filter(is.na(stco_fips))
+place.matched <- place %>%
+  left_join(SifanLiu::pl2co[c("stpl_fips", "pl_label", "st_name", "stco_fips", "afact1", "afact2")],
+    by = c("pl_label", "st_name")
+  ) %>%
+  filter(!is.na(stco_fips)) %>%
+  group_by(pl_label, st_name) %>%
+  # assign place to county with highest afact1
+  top_n(afact1, n = 1) %>%
+  top_n(afact2, n = 1)
 
-# Geocode unmatched use geocoding api
-KEY <- Sys.getenv("GOOGLE_MAP_KEY")
+place.unmatched <- place %>%
+  left_join(SifanLiu::pl2co[c("pl_label", "st_name", "stco_fips", "afact1")],
+    by = c("pl_label", "st_name")
+  ) %>%
+  filter(is.na(stco_fips)) %>%
+  select(-stco_fips)
 
-for (i in 1:nrow(unmatched)) {
-  unmatched$stcobk_fips[[i]] <- add2FIPS(unmatched$Headquarters.Location[[i]], KEY)
-}
 
+place.matched <- bind_rows(
+  place.matched,
 
-# update place list with stco_fips
-place <- bind_rows(
-  matched,
-  unmatched %>%
-    mutate(stco_fips = str_sub(unmatched$stcobk_fips, 1, 5)) %>%
-    select(-stcobk_fips)
-)
-
-# update pl2fips xwalk
-pl2fips <- bind_rows(
-  pl2co,
-  unmatched %>%
-    mutate(stco_fips = str_sub(unmatched$stcobk_fips, 1, 5)) %>%
-    select(-Headquarters.Location, -US)
-)
-
-save(pl2fips, file = "V:/Sifan/SifanLiu/data/pl2fips.rda")
+  # append additional data matched by geocoding results
+  place.unmatched %>%
+    left_join(SifanLiu::pl2fips[c("pl_label", "st_name", "stco_fips")],
+      by = c("pl_label", "st_name")
+    ) %>%
+    filter(!is.na(stco_fips))
+) %>%
+  ungroup() %>%
+  unique() %>%
+  left_join(county_cbsa_st, by = "stco_fips") %>%
+  select(Headquarters.Location, cbsa_code, cbsa_name) %>%
+  unique()
 
 # merge back stco_fips ----------------------------
-df <- df %>%
-  left_join(place, by = "Headquarters.Location") %>%
-  left_join(county_cbsa_st, by = "stco_fips")
+df_cbsa <- cb_all %>%
+  left_join(place.matched, by = "Headquarters.Location") %>%
+  select(Headquarters.Location, Categories, cbsa_code, cbsa_name) %>%
+  unique()
 
+# load stop word
+load("data/cat_name.rda")
+load("data/cat_token.rda")
 
-# aggregate sum by msa
-# To do
-# () apply afact
-# () apply threshold for technologies
-#
-
-cb_city <- unnest_tokens(df, out, Categories, token = "regex", pattern = ",") %>%
-  mutate(out = trimws(out)) %>%
-  # group_by(out) %>%
-  # mutate(count = n()) %>%
-  # filter(count > 5) %>%
+cb_city <- unnest_tokens(df_cbsa, tech_name, Categories, token = "regex", pattern = ",") %>%
+  mutate(name = trimws(tech_name)) %>%
+  right_join(cat_token, by = "name") %>%
+  filter(!rm) %>%
 
   # calculate LQ for each msa-tech pair
-  group_by(cbsa_code, cbsa_name, out) %>%
-  count(out, sort = TRUE) %>%
+  group_by(cbsa_code, cbsa_name, tech_name) %>%
+  count() %>%
   ungroup() %>%
-  mutate(total = sum(n)) %>%
-  group_by(out) %>%
-  mutate(share_us = sum(n) / total) %>%
+  mutate(us_total = sum(n)) %>%
+  
+  group_by(tech_name) %>%
+  mutate(tech_us_total = sum(n),
+         tech_us_share = tech_us_total / us_total) %>%
   ungroup() %>%
+  # remove tech categories that with fewer than 3 companies
+  filter(tech_us_total > 3) %>%
+  
   group_by(cbsa_code, cbsa_name) %>%
-  mutate(share_city = n / sum(n)) %>%
-  mutate(lq = share_city / share_us) %>%
+  mutate(tech_msa_share = n / sum(n)) %>%
+  
+  mutate(lq = tech_msa_share /tech_us_share) %>%
   arrange(-lq) %>%
   ungroup()
+
+# clean <- unnest_tokens(df_cbsa, name, Categories, token = "regex", pattern = ",") %>%
+#   mutate(name = trimws(name)) %>%
+#   right_join(cat_name, by = "name") %>%
+#   filter(!(broad)) %>%
+#   group_by(name,broad) %>%count()
 
 # complexicty -------------------------
 
@@ -112,88 +126,51 @@ nw_city_tech <- cb_city %>%
 
   # a place has Relative Technological Advantage (RTA) when LQ > 1
   filter(lq > 1) %>%
-  
-  select(cbsa_name, cbsa_code,out, lq) %>% 
+  select(cbsa_name, cbsa_code, tech_name, lq) %>%
   # only show top 100 metros
-  filter(cbsa_code %in% get_code_cbsa100())%>%
-  
-  # calculate ubiquity --------
-  group_by(out) %>%
-  mutate(ubi = n())%>%
-    # remove technologies in which less than 10 cities had a RTA
-  filter(ubi > 10) %>%
-  
+  # filter(cbsa_code %in% metro.data::get_code_cbsa100())%>%
   # calculate diversity -------
   group_by(cbsa_name, cbsa_code) %>%
   mutate(div = n()) %>%
-
-
+  # calculate ubiquity --------
+  group_by(tech_name) %>%
+  mutate(ubi = n()) %>%
+  
+  # remove technologies in which only one city had a RTA
+  # filter(ubi > 2) %>%
+  # remove cities with low diversity
+  filter(div > 10) %>%
+  
+  # remove nonmetros
+  filter(!is.na(cbsa_code))%>%
   ungroup()
 
-nw_city_tech <- read.csv("cbsa100_KCI.csv") %>%
-  select(-KCI)
+skimr::skim(nw_city_tech)
 
-# Iterate 20 times to calculateKCI ----------------------------------------
-for (i in 80) {
+# Iterate 100 times to calculateKCI ----------------------------------------
+for (i in 100) {
   df <- nw_city_tech %>%
-    group_by(categories)%>%
-    mutate(ubi = sum(div)/ubi)%>%
-    ungroup()%>%
-    group_by(cbsa_name,cbsa_code)%>%
-    mutate(div = sum(ubi)/div)%>%
+    group_by(tech_name) %>%
+    mutate(ubi = sum(div) / ubi) %>%
+    ungroup() %>%
+    group_by(cbsa_name, cbsa_code) %>%
+    mutate(div = sum(ubi) / div) %>%
     ungroup()
   return(df)
 }
 
-KCI <- df%>%
-  select(cbsa_code, cbsa_name,KCI=div)%>%
+KCI <- df %>%
+  select(cbsa_code, cbsa_name, KCI = div) %>%
   unique()
 
-TCI<- df%>%
-  select(categories,TCI=ubi)%>%
+TCI <- df %>%
+  select(tech_name, TCI = ubi) %>%
   unique()
 
 # save result
-cbsa_TCI_KCI <- nw_city_tech %>% 
-  left_join(KCI,by = c("cbsa_code","cbsa_name"))%>%
-  left_join(TCI, by = "categories")%>%
+cbsa_TCI_KCI <- nw_city_tech %>%
+  left_join(KCI, by = c("cbsa_code", "cbsa_name")) %>%
+  left_join(TCI, by = "tech_name") %>%
   arrange(-KCI)
-  
+
 write.csv(cbsa_TCI_KCI, "cbsa100_KCI.csv")
-
-# Visualize -----------------------------------
-
-p <- ggplot(nw_city_tech %>%
-              group_by(cbsa_code,cbsa_name,div)%>%
-              summarise(mean_ubi = sum(ubi/div)), 
-            aes(x = div, y = mean_ubi, label = cbsa_name)) + geom_point(stat = "identity")
-
-ggplotly(p)
-
-
-# Network -------------------------------------
-
-# https://www.jessesadler.com/post/network-analysis-with-r/
-
-
-nodes <- bind_rows(
-  nw_city_tech%>%
-    select(nodes = cbsa_name)%>%unique()%>%
-    mutate(color.background = "yellow"),
-  nw_city_tech%>%
-    select(nodes = out)%>%unique()%>%
-    mutate(color.background = "blue")
-  )%>%
-  rowid_to_column("id")
-
-edges <- nw_city_tech %>%
-  # filter(diversity>100)%>%
-  left_join(nodes, by = c("cbsa_name" = "nodes")) %>%
-  rename(msa = id) %>%
-  left_join(nodes, by = c("out" = "nodes")) %>%
-  rename(tech = id) %>%
-  select(msa, tech, value = diversity, width = ubiquity)
-
-library(visNetwork)
-
-visNetwork::visNetwork(nodes,edges)
