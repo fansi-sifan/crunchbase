@@ -4,7 +4,7 @@
 # use crunchbase categories to calcultae startup complexity index
 
 # SETUP ================================
-pkgs <- c("tidyverse", "tidytext", "SifanLiu", "metro.data")
+pkgs <- c("tidyverse", "tidytext")
 
 check <- sapply(pkgs, require, warn.conflicts = TRUE, character.only = TRUE)
 if (any(!check)) {
@@ -14,7 +14,7 @@ if (any(!check)) {
 }
 
 # if not installed, install from githubs
-devtools::install_github("fansi-sifan/SifanLiu")
+# devtools::install_github("fansi-sifan/SifanLiu")
 # devtools::install_github("BrookingsInstitution/metro-data-warehouse")
 
 # read data ===============================
@@ -44,9 +44,12 @@ place <- cb_all %>%
 
 # GEOCODE ----------------------
 # source("geocode.R")
+load("../SifanLiu/data/pl2co.rda")
+load("../SifanLiu/data/pl2fips.rda")
+load("../metro.data/data/county_cbsa_st.rda")
 
 place.matched <- place %>%
-  left_join(SifanLiu::pl2co[c("stpl_fips", "pl_label", "st_name", "stco_fips", "afact1", "afact2")],
+  left_join(pl2co[c("stpl_fips", "pl_label", "st_name", "stco_fips", "afact1", "afact2")],
     by = c("pl_label", "st_name")
   ) %>%
   filter(!is.na(stco_fips)) %>%
@@ -56,7 +59,7 @@ place.matched <- place %>%
   top_n(afact2, n = 1)
 
 place.unmatched <- place %>%
-  left_join(SifanLiu::pl2co[c("pl_label", "st_name", "stco_fips", "afact1")],
+  left_join(pl2co[c("pl_label", "st_name", "stco_fips", "afact1")],
     by = c("pl_label", "st_name")
   ) %>%
   filter(is.na(stco_fips)) %>%
@@ -68,7 +71,7 @@ place.matched <- bind_rows(
 
   # append additional data matched by geocoding results
   place.unmatched %>%
-    left_join(SifanLiu::pl2fips[c("pl_label", "st_name", "stco_fips")],
+    left_join(pl2fips[c("pl_label", "st_name", "stco_fips")],
       by = c("pl_label", "st_name")
     ) %>%
     filter(!is.na(stco_fips))
@@ -84,6 +87,8 @@ df_cbsa <- cb_all %>%
   left_join(place.matched, by = "Headquarters.Location") %>%
   select(Headquarters.Location, Categories, cbsa_code, cbsa_name) %>%
   unique()
+
+skimr::skim(df_cbsa)
 
 # load stop word
 load("data/cat_name.rda")
@@ -122,7 +127,7 @@ cb_city <- unnest_tokens(df_cbsa, tech_name, Categories, token = "regex", patter
 
 # complexicty -------------------------
 
-nw_city_tech <- cb_city %>%
+city_tech <- cb_city %>%
 
   # a place has Relative Technological Advantage (RTA) when LQ > 1
   filter(lq > 1) %>%
@@ -134,7 +139,11 @@ nw_city_tech <- cb_city %>%
   mutate(div = n()) %>%
   # calculate ubiquity --------
   group_by(tech_name) %>%
-  mutate(ubi = n()) %>%
+  mutate(ubi = n()) 
+
+skimr::skim(city_tech)
+
+nw_city_tech <- city_tech %>%
   
   # remove technologies in which only one city had a RTA
   # filter(ubi > 2) %>%
