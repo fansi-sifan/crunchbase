@@ -1,20 +1,15 @@
 # Author: Sifan Liu
 # Date: Wed Jun 12 15:34:28 2019
 # --------------
-pkgs <- c('tidyverse')
+# clean crunchbase categories, get at list of stop word
 
-check <- sapply(pkgs,require,warn.conflicts = TRUE,character.only = TRUE)
-if(any(!check)){
-    pkgs.missing <- pkgs[!check]
-    install.packages(pkgs.missing)
-    check <- sapply(pkgs.missing,require,warn.conflicts = TRUE,character.only = TRUE)
-} 
+library("tidyverse")
 
-# FAQ
+# FAQ here
 # https://support.crunchbase.com/hc/en-us/articles/360009616373
 
-# clean categories
-cat <- read_csv("categories-6-12-2019.csv") 
+# clean categories ============
+cat <- read_csv("data/categories-6-12-2019.csv") 
 
 # cat %>% group_by(`Category Groups`)%>%
 #   count()
@@ -26,8 +21,10 @@ cat_broad <- cat$`Category Groups`%>%
   trimws()%>%
   unique()
 
-# write.csv(cat_broad,"cat_broad.csv")
-cat_tech <- read.csv("cat_broad.csv") %>%
+# write.csv(cat_broad,"data/cat_broad.csv")
+# assign tech group manually
+
+cat_tech <- read.csv("data/cat_broad.csv") %>%
   mutate(group = tolower(trimws(group)))
 
 cat_token <- cat %>%
@@ -41,13 +38,16 @@ cat_token <- cat %>%
   mutate(is_tech = str_length(tech_type)>1)%>%
   group_by(`Category Name`)%>%
   summarise(tech = mean(is_tech))%>%
-  mutate(not_tech = tech == 0) %>%
+  mutate(not_tech = (tech == 0)) %>%
+  
   # remove broad names
-  mutate(name = tolower(trimws(`Category Name`)),
+  mutate(tech_name = tolower(trimws(`Category Name`)),
          is_broad = `Category Name` %in% cat_broad) %>%
-  mutate(is_broad = ifelse(name %in% c("internet"), TRUE,is_broad))%>%
+  mutate(is_broad = ifelse(tech_name %in% c("internet"), TRUE,is_broad))%>%
   unique() %>%
+  
   mutate(rm = not_tech | is_broad)
 
+# save result
 save(cat_name,file = "data/cat_name.rda")
 save(cat_token, file = "data/cat_token.rda")
