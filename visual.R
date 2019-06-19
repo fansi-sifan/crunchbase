@@ -1,25 +1,6 @@
 # Author: Sifan Liu
 # Date: Thu Jun 13 10:50:01 2019
 # --------------
-pkgs <- c('tidyverse',"plotly")
-
-check <- sapply(pkgs,require,warn.conflicts = TRUE,character.only = TRUE)
-if(any(!check)){
-    pkgs.missing <- pkgs[!check]
-    install.packages(pkgs.missing)
-    check <- sapply(pkgs.missing,require,warn.conflicts = TRUE,character.only = TRUE)
-} 
-
-
-# Visualize -----------------------------------
-
-p <- ggplot(nw_city_tech %>%
-              group_by(cbsa_code,cbsa_name,div)%>%
-              summarise(mean_ubi = sum(ubi/div)), 
-            aes(x = div, y = mean_ubi, label = cbsa_name)) + geom_point(stat = "identity")
-
-ggplotly(p)
-
 
 # Network -------------------------------------
 
