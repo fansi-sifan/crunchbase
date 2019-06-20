@@ -105,4 +105,4 @@ cb_all_cbsa <- cb_all %>%
   unique()
 
 skimr::skim(cb_all_cbsa)
-save(cb_all_cbsa, file = "cb_all_cbsa.rda")
+save(cb_all_cbsa, file = "data/cb_all_cbsa.rda")
