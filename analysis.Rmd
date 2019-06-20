@@ -1,0 +1,107 @@
+---
+title: "startup complexity analysis"
+output:
+  html_document: default
+  pdf_document: default
+---
+# use crunchbase categories to calcultae startup complexity index
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library("tidyverse")
+library("tidytext")
+load("data/cb_all_cbsa.rda")
+load("data/cat_name.rda")
+load("data/cat_token.rda")
+```
+
+
+```{r construct city-tech pairs}
+cb_tech_cbsa <- unnest_tokens(cb_all_cbsa, tech_name, Categories, token = "regex", pattern = ",") %>%
+  mutate(tech_name = trimws(tech_name)) %>%
+  right_join(cat_token, by = "tech_name") %>%
+  filter(!is_broad) %>%
+  # filter(!rm) %>%
+
+  # calculate LQ for each msa-tech pair
+  group_by(cbsa_code, cbsa_name, tech_name) %>%
+  count() %>%
+  ungroup() %>%
+  mutate(us_total = sum(n)) %>%
+  
+  group_by(tech_name) %>%
+  mutate(tech_us_total = sum(n),
+         tech_us_share = tech_us_total / us_total) %>%
+
+  group_by(cbsa_code, cbsa_name) %>%
+  mutate(tech_msa_share = n / sum(n)) %>%
+  
+  mutate(lq = tech_msa_share /tech_us_share) %>%
+  arrange(-lq) %>%
+  ungroup()
+
+skimr::skim(cb_tech_cbsa)
+```
+## Diversity and Ubiquity
+
+```{r calculate complexity, echo=FALSE}
+complexity_cbsa <- cb_tech_cbsa %>%
+
+  # a place has Relative Technological Advantage (RTA) when LQ > 1
+  filter(lq > 1) %>%
+
+  # calculate diversity -------
+  group_by(cbsa_name, cbsa_code) %>%
+  mutate(div = n()) %>%
+  # calculate ubiquity --------
+  group_by(tech_name) %>%
+  mutate(ubi = n()) %>%
+  ungroup()
+
+skimr::skim(complexity_cbsa)
+```
+
+```{r distribution}
+complexity_cbsa %>%
+  select(tech_name, ubi) %>%
+  unique() %>%
+  skimr::skim()
+
+complexity_cbsa %>%
+  select(cbsa_code, div) %>%
+  unique() %>%
+  skimr::skim()
+```
+
+## Method of refliections
+```{r, echo = FALSE}
+source("func.R")
+complexity_cbsa_final <- remove_outliers(complexity_cbsa, ubi_rm = 5,div_rm = 10)
+cbsa_TCI_KCI <- create_output(complexity_cbsa_final, itr = 50)
+skimr::skim(cbsa_TCI_KCI)
+```
+
+```{r}
+ggplotly(plot_mean_ubi(complexity_cbsa_final))
+
+```
+```{r summary}
+cbsa_KCI <- cbsa_TCI_KCI %>%
+  select(cbsa_code, cbsa_name,startup_complexity = div)%>% 
+  arrange(-startup_complexity) %>%
+  unique()
+
+head(cbsa_KCI)
+tail(cbsa_KCI)
+```
+
+```{r correlation matrix}
+library(corrplot)
+load("data/cbsa_cor.rda")
+
+M <- cor(cbsa_cor[3:10],use = "pairwise.complete.obs")
+
+corrplot(M, method = "color", type ="upper",
+         addCoef.col = "black", tl.col = "black",tl.srt=45)
+```
+
