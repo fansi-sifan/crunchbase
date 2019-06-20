@@ -19,9 +19,9 @@ remove_outliers <- function(df,ubi_rm,div_rm){
     ungroup()
 }
 
-create_output <- function(df){
+create_output <- function(df, itr){
   # Iterate 100 times to calculate KCI
-  for (i in 100) {
+  for (i in itr) {
     tmp <- df %>%
       group_by(tech_name) %>%
       mutate(ubi = sum(div) / ubi) %>%
