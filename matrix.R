@@ -1,8 +1,12 @@
-
+library(tidyverse)
 
 # matrix plot
 load("../metro.data/data/county_cbsa_st.rda")
 load("../metro-datasets/metro_monitor_2019/metro_monitor_2019.rda")
+
+cbsa_ECI <- read.csv("Metro_ECI_SI.csv") %>%
+  mutate(cbsa_code = as.character(msa)) %>%
+  select(-contains("msa"),-X)
 
 cbsa_VC <- read.csv("../metro-datasets/source/VC.csv") %>%
   filter(round == "Total VC" & measure == "Capital Invested ($ M) per 1M Residents") %>%
@@ -32,20 +36,32 @@ cbsa_univRD <- NSF_univRD %>%
   select(cbsa_code, RD_value = RDtotal)
 
 cbsa_cor <- cbsa_KCI %>%
-  left_join(county_cbsa_st[c("cbsa_code","cbsa_emp")], by = "cbsa_code") %>%
-  left_join(cbsa_metromonitor[c("cbsa_code","output_per_job","employment_at_firms_0_5_years_old")], by = "cbsa_code") %>%
-  left_join(cbsa_VC, by = "cbsa_code")%>%
-  left_join(cbsa_I5HGC, by = "cbsa_code")%>%
-  left_join(cbsa_patentCOMP, by = "cbsa_code")%>%
-  left_join(cbsa_USPTO, by = "cbsa_code")%>%
-  left_join(cbsa_univRD, by = "cbsa_code")%>%
-  mutate(VC = VC/cbsa_emp,
-         patent_total = VC/cbsa_emp,
-         RD_value = RD_value/cbsa_emp,
-         young_firm = employment_at_firms_0_5_years_old/cbsa_emp)
+  select(-cbsa_name)%>%
+  full_join(county_cbsa_st[c("cbsa_code","cbsa_emp")], by = "cbsa_code") %>%
+  full_join(cbsa_metromonitor[c("cbsa_code","output_per_job","employment_at_firms_0_5_years_old")], by = "cbsa_code") %>%
+  full_join(cbsa_VC, by = "cbsa_code")%>%
+  full_join(cbsa_I5HGC, by = "cbsa_code")%>%
+  full_join(cbsa_patentCOMP, by = "cbsa_code")%>%
+  full_join(cbsa_USPTO, by = "cbsa_code")%>%
+  full_join(cbsa_univRD, by = "cbsa_code")%>%
+  full_join(cbsa_ECI, by = "cbsa_code")%>%
+  mutate(patent_pemp = VC/cbsa_emp,
+         RD_pemp = RD_value/cbsa_emp,
+         pct_young_firm = employment_at_firms_0_5_years_old/cbsa_emp)%>%
+  select(- employment_at_firms_0_5_years_old, -patent_total,-RD_value)%>%
+  unique()
 
 save(cbsa_cor, file = "data/cbsa_cor.rda")
 
+colSums(!is.na(cbsa_cor))
+
+# plot
+M <- cor(cbsa_cor[2:12],use = "pairwise.complete.obs")
+
 corrplot(M, method = "color", type ="upper",
          addCoef.col = "black", tl.col = "black",tl.srt=45)
+
+cbsa_cor %>%
+  filter(cbsa_code %in% c("19740","24340"))
+
 

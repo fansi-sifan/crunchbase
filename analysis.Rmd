@@ -76,7 +76,7 @@ complexity_cbsa %>%
 ## Method of refliections
 ```{r, echo = FALSE}
 source("func.R")
-complexity_cbsa_final <- remove_outliers(complexity_cbsa, ubi_rm = 5,div_rm = 10)
+complexity_cbsa_final <- remove_outliers(complexity_cbsa, ubi_rm = 5,div_rm = 5)
 cbsa_TCI_KCI <- create_output(complexity_cbsa_final, itr = 50)
 skimr::skim(cbsa_TCI_KCI)
 ```
@@ -97,9 +97,8 @@ tail(cbsa_KCI)
 
 ```{r correlation matrix}
 library(corrplot)
-load("data/cbsa_cor.rda")
-
-M <- cor(cbsa_cor[3:10],use = "pairwise.complete.obs")
+# load("data/cbsa_cor.rda")
+# source(matrix.r)
 
 corrplot(M, method = "color", type ="upper",
          addCoef.col = "black", tl.col = "black",tl.srt=45)
