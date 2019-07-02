@@ -101,7 +101,10 @@ place.matched <- bind_rows(
 # merge back stco_fips ----------------------------
 cb_all_cbsa <- cb_all %>%
   left_join(place.matched, by = "Headquarters.Location") %>%
-  select(Headquarters.Location, Categories, cbsa_code, cbsa_name) %>%
+  select(Organization.Name,
+         Headquarters.Location, Categories, Category.Groups,
+         Funding = Total.Funding.Amount.Currency..in.USD.,
+         cbsa_code, cbsa_name) %>%
   unique()
 
 skimr::skim(cb_all_cbsa)
