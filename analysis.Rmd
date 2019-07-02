@@ -16,6 +16,30 @@ load("data/cat_token.rda")
 ```
 
 
+```{r life science cluster}
+cbsa_n_tot <- cb_all_cbsa %>% 
+  group_by(cbsa_code,cbsa_name)%>%
+  summarise(cbsa_n_tot = n())
+
+cbsa_n_lifesci <- cb_all_cbsa %>% 
+  filter(grepl("Biotechnology|Health Care",Category.Groups))%>%
+  group_by(cbsa_code,cbsa_name)%>%
+  summarise(cbsa_n_lifesci = n())
+
+tmp <- cbsa_n_tot %>%
+  left_join(cbsa_n_lifesci, by = "cbsa_code")%>%
+  mutate(cbsa_pct_lifesci = cbsa_n_lifesci/cbsa_n_tot)%>%
+  ungroup()%>%
+  mutate(us_n_lifesci = sum(cbsa_n_lifesci,na.rm = T),
+         us_n_tot = sum(cbsa_n_tot,na.rm = T),
+         us_pct_lifesci = us_n_lifesci/us_n_tot,
+         cbsa_lq_lifesci = cbsa_pct_lifesci/us_pct_lifesci)%>%
+  select(-contains(".y"))
+  
+
+```
+
+
 ```{r construct city-tech pairs}
 cb_tech_cbsa <- unnest_tokens(cb_all_cbsa, tech_name, Categories, token = "regex", pattern = ",") %>%
   mutate(tech_name = trimws(tech_name)) %>%
