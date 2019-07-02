@@ -4,6 +4,7 @@
 # clean crunchbase categories, get at list of stop word
 
 library("tidyverse")
+library("tidytext")
 
 # FAQ here
 # https://support.crunchbase.com/hc/en-us/articles/360009616373
