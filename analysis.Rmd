@@ -15,6 +15,30 @@ load("data/cat_name.rda")
 load("data/cat_token.rda")
 ```
 
+```{r}
+co_n_tot <- cb_all_cbsa %>% 
+  group_by(stco_code)%>%
+  summarise(co_n_tot = n())
+
+co_n_lifesci <- cb_all_cbsa %>% 
+  filter(grepl("Biotechnology|Health Care",Category.Groups))%>%
+  group_by(stco_code)%>%
+  summarise(co_n_lifesci = n())
+
+tmp <- co_n_tot %>%
+  left_join(co_n_lifesci, by = "stco_code")%>%
+  mutate(co_pct_lifesci = co_n_lifesci/co_n_tot)%>%
+  ungroup()%>%
+  mutate(us_n_lifesci = sum(co_n_lifesci,na.rm = T),
+         us_n_tot = sum(co_n_tot,na.rm = T),
+         us_pct_lifesci = us_n_lifesci/us_n_tot,
+         co_lq_lifesci = co_pct_lifesci/us_pct_lifesci)%>%
+  select(-contains(".y"))
+
+write.csv(tmp, "../Birmingham/County Cluster/source/startup_life_co.csv")
+  
+```
+
 
 ```{r life science cluster}
 cbsa_n_tot <- cb_all_cbsa %>% 
@@ -36,7 +60,7 @@ tmp <- cbsa_n_tot %>%
          cbsa_lq_lifesci = cbsa_pct_lifesci/us_pct_lifesci)%>%
   select(-contains(".y"))
   
-
+write.csv(tmp,"../Birmingham/County Cluster/source/startup_life_cbsa.csv")
 ```
 
 
