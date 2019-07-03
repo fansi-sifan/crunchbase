@@ -93,15 +93,15 @@ place.matched <- bind_rows(
     filter(!is.na(stco_fips))
 ) %>%
   ungroup() %>%
-  unique() %>%
-  left_join(county_cbsa_st, by = "stco_fips") %>%
-  select(Headquarters.Location, cbsa_code, cbsa_name) %>%
+  unique() %>% rename(stco_code = stco_fips)%>%
+  left_join(county_cbsa_st, by = "stco_code") %>%
+  select(Headquarters.Location, stco_code, cbsa_code, cbsa_name) %>%
   unique()
 
 # merge back stco_fips ----------------------------
 cb_all_cbsa <- cb_all %>%
   left_join(place.matched, by = "Headquarters.Location") %>%
-  select(Organization.Name,
+  select(Organization.Name,stco_code,
          Headquarters.Location, Categories, Category.Groups,
          Funding = Total.Funding.Amount.Currency..in.USD.,
          cbsa_code, cbsa_name) %>%
