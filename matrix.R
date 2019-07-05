@@ -1,7 +1,7 @@
 library(tidyverse)
 
 # matrix plot
-load("../metro.data/data/county_cbsa_st.rda")
+load("../metro-data-warehouse/data/county_cbsa_st.rda")
 load("../metro-datasets/metro_monitor_2019/metro_monitor_2019.rda")
 
 cbsa_ECI <- read.csv("Metro_ECI_SI.csv") %>%
@@ -45,10 +45,10 @@ cbsa_cor <- cbsa_KCI %>%
   full_join(cbsa_USPTO, by = "cbsa_code")%>%
   full_join(cbsa_univRD, by = "cbsa_code")%>%
   full_join(cbsa_ECI, by = "cbsa_code")%>%
-  mutate(patent_pemp = VC/cbsa_emp,
+  mutate(patent_pemp = patent_total/cbsa_emp,
          RD_pemp = RD_value/cbsa_emp,
          pct_young_firm = employment_at_firms_0_5_years_old/cbsa_emp)%>%
-  select(- employment_at_firms_0_5_years_old, -patent_total,-RD_value)%>%
+  rename(young_firms = employment_at_firms_0_5_years_old)%>%
   unique()
 
 save(cbsa_cor, file = "data/cbsa_cor.rda")
@@ -56,12 +56,39 @@ save(cbsa_cor, file = "data/cbsa_cor.rda")
 colSums(!is.na(cbsa_cor))
 
 # plot
-M <- cor(cbsa_cor[2:12],use = "pairwise.complete.obs")
+M <- cor(cbsa_cor%>%select_if(is.numeric),use = "pairwise.complete.obs")
 
 corrplot(M, method = "color", type ="upper",
          addCoef.col = "black", tl.col = "black",tl.srt=45)
 
 cbsa_cor %>%
   filter(cbsa_code %in% c("19740","24340"))
+
+
+
+plot_mean_ubi(complexity_cbsa_final)+
+  geom_text(check_overlap = T, hjust = 0, nudge_x = 0.1)+theme_classic()+
+  scale_x_continuous(limits = c(0,300))
+
+ggplotly(plot_mean_ubi(complexity_cbsa_final))
+
+corrplot(M, method = "color", type ="upper",
+         addCoef.col = "black", tl.col = "black",tl.srt=45)
+
+
+
+fit <- lm(startup_complexity ~ cbsa_emp+output_per_job+VC+patent_complexity+eci+coi+patent_pemp+RD_pemp+pct_young_firm, data = cbsa_cor)
+
+model <- na.omit(cbsa_cor %>%
+                   select(startup_complexity, cbsa_emp, output_per_job, patent_pemp, eci, patent_complexity)%>%
+                   mutate(cbsa_emp = cbsa_emp/1000000,output_per_job = output_per_job/1000))
+
+fit <- lm(startup_complexity ~ cbsa_emp+eci+patent_pemp, data = model)
+fit <- lm(output_per_job ~ cbsa_emp+startup_complexity+patent_complexity, data = model)
+fit <- lm(output_per_job ~ cbsa_emp+startup_complexity, data = model)
+
+summary(fit)
+format(summary(fit)$r.squared, digits = 2)
+
 
 
