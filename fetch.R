@@ -5,29 +5,82 @@
 
 library(httr)
 library(jsonlite)
+library(lubridate)
+library(dplyr)
 
-# TEST ===================================
+# API SETUP ===================================
 key <- Sys.getenv("CRUNCHBASE_KEY")
-query <- "https://api.crunchbase.com/v3.1/organizations?user_key="
-query <- "https://api.crunchbase.com/v3.1/organizations/facebook?relationships=funding_rounds,investors&user_key="
+base <- "https://api.crunchbase.com/v3.1/organizations"
+country <- "United%20States"
+type <- "company"
 
-query <- "https://api.crunchbase.com/v3.1/odm-organizations?locations=US&organization_type=company&user_key="
+# Get first query result --------------------------------
+# query <- paste0(base,
+#                 "?locations=", country,
+#                 "&organization_types=", type,
+#                 "&user_key=", key)
+#
+# df <- fromJSON(query)
+#
+# # FETCh all data via continuous pagniation -----------------------------
+# while (!is.null(df$data$paging$key_set_url)){
+#
+#   query <- paste0(df$data$paging$key_set_url,"&user_key=",key)
+#   df <- fromJSON(query)
+#   tmp <- bind_rows(tmp,df$data$items$properties %>% as.data.frame())
+#
+#   # print progress
+#   print(nrow(tmp)/df$data$paging$total_items)
+#
+# }
 
 
-# temp <- GET(paste0(query, key))
-df <- fromJSON(paste0(query,key))
+# get details for each organization ------------------------
+# https://api.crunchbase.com/v3.1/organizations/facebook?relationships=funding_rounds,investors&user_key=INSERT_KEY_HERE
+load(file = "cb_us_companies.rda")
 
-str(df$data$items)
+rel <- "categories,funding_rounds,acquisitions"
 
-# FETCH FUNCTIONS ========================
+# fetch information
+get_data <- function(data) {
+  if (is.null(data)) {
+    return(NA)
+  } else {
+    paste(data, collapse = ", ")
+  }
+}
 
-# DEFINE STARTUPS ========================
+tmp <- tmp %>%
+  mutate(cat_detail = NA, isclosed = NA, founded_year = NA, closed_year = NA, funding_year = NA, funding_type = NA)
 
-# FETCH DATA =============================
+for (i in 1:100) {
+  t <- try({
+    query <- paste0(
+      base,
+      "/", tmp$permalink[[i]], "?",
+      "relationships=", rel,
+      "&user_key=", key
+    )
+    df <- fromJSON(query)
+  }, silent = TRUE)
 
-# SAVE ===================================
 
-# try rcrunchbase packsge --------
-# http://htmlpreview.github.io/?https://github.com/tarakc02/rcrunchbase/blob/master/vignettes/getting-started.html
-library(rcrunchbase)
-rcrunchbase::crunchbase_expand_section()
+  if ("try-error" %in% class(t)) {
+    next
+  }
+  else {
+    tmp$cat_detail[[i]] <- get_data(df$data$relationships$categories$items$properties$name)
+
+    tmp$founded_year[i] <- get_data(df$data$properties$founded_on)
+    tmp$isclosed[i] <- get_data(df$data$properties$is_closed)
+    tmp$closed_year[i] <- get_data(df$data$properties$closed_on)
+
+    tmp$funding_year[[i]] <- get_data(df$data$relationships$funding_rounds$items$properties$announced_on)
+    tmp$funding_type[[i]] <- get_data(df$data$relationships$funding_rounds$items$properties$funding_type)
+  }
+  
+  if (i %% 10 == 0) {
+    print(paste0(i/nrow(tmp), " completed"))
+  }
+  
+}
