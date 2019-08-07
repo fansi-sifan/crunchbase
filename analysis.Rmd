@@ -15,7 +15,7 @@ load("data/cat_name.rda")
 load("data/cat_token.rda")
 ```
 
-```{r}
+```{r life science county}
 co_n_tot <- cb_all_cbsa %>% 
   group_by(stco_code)%>%
   summarise(co_n_tot = n())
@@ -40,7 +40,7 @@ write.csv(tmp, "../Birmingham/County Cluster/source/startup_life_co.csv")
 ```
 
 
-```{r life science cluster}
+```{r life science cluster cbsa}
 cbsa_n_tot <- cb_all_cbsa %>% 
   group_by(cbsa_code,cbsa_name)%>%
   summarise(cbsa_n_tot = n())
@@ -130,6 +130,7 @@ skimr::skim(cbsa_TCI_KCI)
 ```
 
 ```{r}
+library(plotly)
 ggplotly(plot_mean_ubi(complexity_cbsa_final))
 
 ```
@@ -145,8 +146,9 @@ tail(cbsa_KCI)
 
 ```{r correlation matrix}
 library(corrplot)
-# load("data/cbsa_cor.rda")
+load("data/cbsa_cor.rda")
 # source(matrix.r)
+M <- cor(cbsa_cor%>%select_if(is.numeric),use = "pairwise.complete.obs")
 
 corrplot(M, method = "color", type ="upper",
          addCoef.col = "black", tl.col = "black",tl.srt=45)
