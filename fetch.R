@@ -34,7 +34,7 @@ type <- "company"
 #
 # }
 
-
+save(tmp, file = "cb_us_companies.rda")
 # get details for each organization ------------------------
 # https://api.crunchbase.com/v3.1/organizations/facebook?relationships=funding_rounds,investors&user_key=INSERT_KEY_HERE
 load(file = "cb_us_companies.rda")
@@ -53,7 +53,7 @@ get_data <- function(data) {
 tmp <- tmp %>%
   mutate(cat_detail = NA, isclosed = NA, founded_year = NA, closed_year = NA, funding_year = NA, funding_type = NA)
 
-for (i in 1:100) {
+for (i in 1:nrow(tmp)) {
   t <- try({
     query <- paste0(
       base,
@@ -79,7 +79,7 @@ for (i in 1:100) {
     tmp$funding_type[[i]] <- get_data(df$data$relationships$funding_rounds$items$properties$funding_type)
   }
   
-  if (i %% 10 == 0) {
+  if (i %% 1000 == 0) {
     print(paste0(i/nrow(tmp), " completed"))
   }
   
