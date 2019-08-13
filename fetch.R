@@ -80,7 +80,7 @@ for (i in 1:nrow(tmp)) {
   }
   
   if (i %% 1000 == 0) {
-    print(paste0(i/nrow(tmp), " completed"))
+    print(paste0(i/nrow(tmp), " completed at ", Sys.time()))
   }
   
 }
