@@ -1,11 +1,25 @@
 # Author: Sifan Liu
 # Date: Wed Jun 12 15:34:28 2019
 # --------------
-# clean crunchbase categories, get at list of stop word
+
+# library(httr)
+# library(jsonlite)
+# library(dplyr)
+# 
+# # API SETUP ===================================
+# key <- Sys.getenv("CRUNCHBASE_KEY")
+# base <- "https://api.crunchbase.com/v3.1/categories"
+# 
+# query <- paste0(base,"?user_key=", key)
+# 
+# df <- fromJSON(query)
+# 
+# tmp <- df$data$items$properties
 
 library("tidyverse")
 library("tidytext")
 
+# clean crunchbase categories, get at list of stop word
 # FAQ here
 # https://support.crunchbase.com/hc/en-us/articles/360009616373
 
