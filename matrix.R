@@ -1,3 +1,13 @@
+metromonitor <- read.csv("Q:/_TO SHAREPOINT/ARCHIVE/cshearer/metro monitor/data/2019/Prosperity Change 2019-03-09 .csv")%>%
+  filter(year == "2007-2017")%>%
+  filter(indicator == "Percent Change in Output per Job")%>%
+  mutate(cbsa_code = as.character(cbsa_code))
+
+output <- cbsa_KCI %>%
+  left_join(metromonitor, by = "cbsa_code")
+
+write.csv(output, "cbsa_KCI.csv")
+
 library(tidyverse)
 
 # matrix plot
