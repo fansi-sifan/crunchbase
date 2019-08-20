@@ -1,0 +1,12 @@
+name: cb-scenarios
+title: cb-scenarios
+username:
+account: sifan
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 1099197
+bundleId: 2338315
+url: https://sifan.shinyapps.io/cb-scenarios/
+when: 1566322455.21779
+asMultiple: FALSE
+asStatic: FALSE
