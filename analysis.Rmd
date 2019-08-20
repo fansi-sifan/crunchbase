@@ -10,7 +10,7 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 library("tidyverse")
 library("tidytext")
-load("data/cb_all_cbsa.rda")
+# load("data/cb_all_cbsa.rda")
 load("data/cat_name.rda")
 load("data/cat_token.rda")
 ```
@@ -65,7 +65,7 @@ write.csv(tmp,"../Birmingham/County Cluster/source/startup_life_cbsa.csv")
 
 
 ```{r construct city-tech pairs}
-cb_tech_cbsa <- unnest_tokens(cb_all_cbsa, tech_name, Categories, token = "regex", pattern = ",") %>%
+cb_tech_cbsa <- unnest_tokens(cb_cbsa, tech_name, cat_detail, token = "regex", pattern = ",") %>%
   mutate(tech_name = trimws(tech_name)) %>%
   right_join(cat_token, by = "tech_name") %>%
   filter(!is_broad) %>%
@@ -123,7 +123,7 @@ complexity_cbsa %>%
 
 ## Method of refliections
 ```{r, echo = FALSE}
-source("func.R")
+# source("func.R")
 complexity_cbsa_final <- remove_outliers(complexity_cbsa, ubi_rm = 5,div_rm = 5)
 cbsa_TCI_KCI <- create_output(complexity_cbsa_final, itr = 50)
 skimr::skim(cbsa_TCI_KCI)
@@ -134,6 +134,7 @@ library(plotly)
 ggplotly(plot_mean_ubi(complexity_cbsa_final))
 
 ```
+
 ```{r summary}
 cbsa_KCI <- cbsa_TCI_KCI %>%
   select(cbsa_code, cbsa_name,startup_complexity = div)%>% 
