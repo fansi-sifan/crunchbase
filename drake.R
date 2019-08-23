@@ -1,30 +1,32 @@
 library(drake)
 
-plan <- drake_plan(
+plan = drake_plan(
   raw_data = readRDS("cb_us_companies.rda"),
   
-  xwalk = raw_data %>%
-    geocode(),
+  # define the sample universe
+  companies = tmp %>%
+    clean_cols() %>%
+    define_startups(start = 2010, end = 2019, last_fund = 2014) ,
   
-  category = raw_data %>%
-    clean_cat(),
+  # get cbsa_code for places
+  matched <- match_cbsa(),
   
-  data = raw_data %>% 
-    clean_cols()%>%
-    define_startups(start, end, last_fund)%>%
-    remove_outliers(min_ubi, min_div)%>%
-    define_cat(category)%>%
-    match_geo(xwalk)%>%
-    create_outputs(iterations),
+  cb_cbsa = companies %>%
+    left_join(matched, by = c("city_name", "region_name")),
   
-  plot = plot_mean_ubi(data),
+  final = cb_cbsa %>%
+    clean_cat(min=5) %>%
+    calculate_LQ()%>%
+    calculate_tci()%>%
+    remove_outliers(ubi_rm = 5,div_rm = 5),
   
-  report = rmarkdown::render(
-    knitr_in("analysis.Rmd"),
-    output_file = file_out("analysis.html"),
-    quiet = TURE
-  )  
+  summary = final %>%
+    create_output(itr=100),
+  
+  plot = plot_mean_ubi(final)
   
 )
+
+make(plan)
 
 vis_drake_graph(drake_config(plan))
