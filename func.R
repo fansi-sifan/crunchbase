@@ -1,8 +1,9 @@
 library(lubridate)
 library(tidyverse)
+library(tidytext)
 library(skimr)
 
-load("cb_us_companies.rda")
+source("cb-scenarios/helper.R")
 
 clean_cols <- function(df) {
   df %>%
@@ -25,13 +26,6 @@ clean_cols <- function(df) {
     )
 }
 
-skimr::skim(tmp)
-
-
-tmp %>%
-  clean_cols() %>%
-  group_by(funding_type_latest) %>%
-  count() %>% arrange(-n)
 
 # DEFINITIONS
 # https://support.crunchbase.com/hc/en-us/articles/115010458467-Glossary-of-Funding-Types
@@ -98,87 +92,20 @@ match_place <- function(df) {
   return(list(place.matched, place.unmatched))
 }
 
-# test run
-
-companies <- tmp %>%
-  clean_cols() %>%
-  # companies that was founded in the last 10 years, and received at least one funding in the last 5 years
-  # define_startups(start = 1998, end = 2009, last_fund = 2003)
-  define_startups(start = 1998, end = 2009, last_fund = 2003)
-
-outcome <- companies %>% match_place()
-unmatched <- outcome[[2]]
-
-matched <- outcome[[1]] %>%
-  left_join(metro.data::county_cbsa_st, by = "stco_code") %>%
-  select(city_name, region_name, stco_code, cbsa_code, cbsa_name) %>%
-  unique()
-
-cb_cbsa <- companies %>%
-  left_join(matched, by = c("city_name", "region_name"))
-
-skimr::skim(cb_cbsa)
-
-
-remove_outliers <- function(df, ubi_rm, div_rm) {
-  df %>%
+match_cbsa <- function(){
+  address = companies %>% match_place()
+  unmatched = address[[2]]
+  
+  if (length(unmatched)>0) {
+    print(paste0(length(unmatched), " places unmatched!"))
     
-    # remove technologies only claimed by one city
-    filter(ubi > !!ubi_rm) %>%
-    # remove cities with low diversity
-    filter(div > !!div_rm) %>%
-    
-    # remove nonmetros
-    filter(!is.na(cbsa_code)) %>%
-    ungroup() %>%
-    # recalculate diversity -------
-  group_by(cbsa_name, cbsa_code) %>%
-    mutate(div = n()) %>%
-    # recalculate ubiquity --------
-  group_by(tech_name) %>%
-    mutate(ubi = n()) %>%
-    ungroup()
-}
-
-create_output <- function(df, itr) {
-  # Iterate 100 times to calculate KCI
-  for (i in itr) {
-    tmp <- df %>%
-      group_by(tech_name) %>%
-      mutate(ubi = sum(div) / ubi) %>%
-      ungroup() %>%
-      group_by(cbsa_name, cbsa_code) %>%
-      mutate(div = sum(ubi) / div) %>%
-      ungroup()
-    return(tmp)
   }
   
-  KCI <- tmp %>%
-    select(cbsa_code, cbsa_name, KCI = div) %>%
+  matched = address[[1]] %>%
+    left_join(metro.data::county_cbsa_st, by = "stco_code") %>%
+    select(city_name, region_name, stco_code, cbsa_code, cbsa_name) %>%
     unique()
   
-  TCI <- tmp %>%
-    select(tech_name, TCI = ubi) %>%
-    unique()
-  
-  # merge
-  output <- df %>%
-    left_join(KCI, by = c("cbsa_code", "cbsa_name")) %>%
-    left_join(TCI, by = "tech_name") %>%
-    arrange(-KCI)
-  
-  return(output)
+  return(matched)
 }
 
-
-plot_mean_ubi <- function(df) {
-  ggplot(
-    df %>%
-      group_by(cbsa_code, cbsa_name, div) %>%
-      summarise(mean_ubi = sum(ubi / div)),
-    aes(x = div, y = mean_ubi, label = cbsa_name)
-  ) +
-    geom_point(stat = "identity") +
-    geom_vline(aes(xintercept = mean(div)), color = "red") +
-    geom_hline(aes(yintercept = mean(mean_ubi)), color = "red")
-}
