@@ -10,6 +10,9 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 library("tidyverse")
 library("tidytext")
+
+source("func.R")
+
 # load("data/cb_all_cbsa.rda")
 load("data/cat_name.rda")
 load("data/cat_token.rda")
@@ -67,8 +70,9 @@ write.csv(tmp,"../Birmingham/County Cluster/source/startup_life_cbsa.csv")
 ```{r construct city-tech pairs}
 cb_tech_cbsa <- unnest_tokens(cb_cbsa, tech_name, cat_detail, token = "regex", pattern = ",") %>%
   mutate(tech_name = trimws(tech_name)) %>%
-  right_join(cat_token, by = "tech_name") %>%
-  filter(!is_broad) %>%
+  group_by(tech_name) %>% mutate(n = n()) %>% filter(n>=5) %>%
+  # right_join(cat_token, by = "tech_name") %>%
+  # filter(!is_broad) %>%
   # filter(!rm) %>%
 
   # calculate LQ for each msa-tech pair
@@ -107,6 +111,7 @@ complexity_cbsa <- cb_tech_cbsa %>%
   ungroup()
 
 skimr::skim(complexity_cbsa)
+save(complexity_cbsa,file = "cb-scenarios/data/complexity_cbsa.rda")
 ```
 
 ```{r distribution}
