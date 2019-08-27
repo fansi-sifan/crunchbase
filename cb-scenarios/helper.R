@@ -24,7 +24,10 @@ calculate_LQ_alt <- function(df) {
     ) %>%
     group_by(cbsa_code, cbsa_name) %>%
     mutate(tech_msa_share = n / sum(n)) %>%
-    mutate(lq = tech_msa_share / tech_us_share) %>%
+    mutate(
+      lq = tech_msa_share / tech_us_share,
+      LQ = n * lq / us_total * 10000
+    ) %>%
     arrange(-lq) %>%
     ungroup()
 }
@@ -34,23 +37,34 @@ calculate_LQ <- function(df) {
     group_by(cbsa_code, cbsa_name, tech_name) %>%
     dplyr::count() %>%
     ungroup() %>%
-    mutate(us_total = sum(n)) %>%
-    group_by(tech_name) %>%
-    mutate(
-      tech_us_total = sum(n),
-      tech_us_share = tech_us_total / us_total
-    ) %>%
-    group_by(cbsa_code, cbsa_name) %>%
-    mutate(tech_msa_share = n / sum(n)) %>%
-    mutate(lq = tech_msa_share / tech_us_share) %>%
-    arrange(-lq) %>%
-    ungroup()
+    calculate_LQ_alt()
 }
 
-calculate_tci <- function(df) {
+calculate_zLQ <- function(df) {
   df %>%
-    # a place has Relative Technological Advantage (RTA) when LQ > 1
-    filter(lq > 1) %>%
+    # group_by(tech_name) %>%
+    mutate(
+      z_LQ = (LQ - mean(LQ)) / sd(LQ),
+      z_lq = (lq - mean(lq)) / sd(lq)
+    )
+  # a place has Relative Technological Advantage (RTA) when LQ > 1
+  # filter(lq > z_score)
+}
+
+bootstrap_SLQ <- function(df) {
+
+}
+
+calculate_tci <- function(df, method = "lq") {
+  df %>%
+    mutate(
+      is.RCA_LQ = ifelse(z_LQ >= 1.96, T, F),
+      is.RCA_lq = ifelse(z_lq >= 1.96, T, F),
+      is.lq = ifelse(lq > 1, T, F)
+    ) %>%
+    {
+      if (method == "LQ") filter(., is.RCA_LQ) else filter(., is.lq)
+    } %>%
 
     # calculate diversity -------
     group_by(cbsa_name, cbsa_code) %>%
@@ -147,18 +161,22 @@ create_network <- function(df, freq, metro_name) {
   # t <- v / d # min?
 
   # test.gr <- igraph::graph_from_adjacency_matrix(v, mode = "undirected", weighted = T)
-  edges <-  as.data.frame(as.table(v)) %>% filter(Freq >!!freq)
+  edges <- as.data.frame(as.table(v)) %>% filter(Freq > !!freq)
   colnames(edges) <- c("from", "to", "value")
-    
+
   # test.visn <- toVisNetworkData(test.gr)
-  msa_space <- (df%>%filter(cbsa_name==!!metro_name))$tech_name
-  nodes <- bind_rows(edges%>%select(id=from),
-                 edges%>%select(id=to))%>%
-    unique()%>%
-    mutate(label = id,
-           color.background = ifelse(label %in% msa_space,"blue","grey"))
-  
-  return(list("edges"=edges,"nodes"=nodes))
+  msa_space <- (df %>% filter(cbsa_name == !!metro_name))$tech_name
+  nodes <- bind_rows(
+    edges %>% select(id = from),
+    edges %>% select(id = to)
+  ) %>%
+    unique() %>%
+    mutate(
+      label = id,
+      color.background = ifelse(label %in% msa_space, "blue", "grey")
+    )
+
+  return(list("edges" = edges, "nodes" = nodes))
 }
 
 Plot_network <- function(nw) {
