@@ -51,34 +51,64 @@ cb_cbsa_cleaned %>%
 # SANDBOX ======================================
 tmp <- cb_cbsa %>%
   # threshold for tech tags to qualify
-  clean_cat(min = 10, max = 4500) %>%
+  clean_cat(min = 10, max = 5000) %>%
   # calculate LQ by tech and city
-  calculate_LQ()%>%
-  calculate_zLQ()
+  calculate_LQ() %>%
+  filter( n >= 3) %>%
+  calculate_LQ_alt()%>%
+  calculate_SLQ() 
+  
 
-summary(tmp$is.lq)
-summary(tmp$is.RCA_LQ)
-summary(tmp$is.RCA_lq)
-
-
-get_zscore <- function(df){
-  quantile(as.data.frame(df)$z_LQ, 0.95)
+get_zscore <- function(df, col){
+  quantile(as.data.frame(df)[[col]], 0.5)
 }
 
-boots <- function(df){
-  set.seed(23)
-  mean((bootstraps(tmp, times = 999) %>%
-          mutate(SLQ = map_dbl(splits, get_zscore)))$SLQ)
+boots <- function(df,col, ...){
+  set.seed(20)
+  boo <- bootstraps(df, ...) %>%
+    mutate(value = map_dbl(splits, get_zscore, col))
+  
+  df %>% 
+    mutate(value = mean(boo$value))%>%
+    select(tech_name, value)%>%
+    unique()
 }
 
-boots (tmp %>% filter(tech_name=="fitness"))
-# bootstrap
-
-tmp %>%
+# bootstrap to get SLLQ
+get_SLLQ <- function(df, col){
+  bind_rows(df %>%
   group_by(tech_name)%>%
-  mutate(SLLQ = boots())
+  group_map(~ boots(.x,col, times = 9), keep = T))
+}
+
+output <- tmp %>%
+  left_join(get_SLLQ(tmp, "SLQ"), by = "tech_name")%>%
+  left_join(get_SLLQ(tmp, "slq"), by = "tech_name")
+
+a <- output %>%
+  filter(SLQ > value.x)%>%
+  calculate_tci()%>%
+  remove_outliers(ubi_rm = 3, div_rm = 3, msa = F, firm_n = 3) %>%
+  
+  # repeat the calculation
+  calculate_LQ_alt() %>%
+  calculate_tci() %>%
+  remove_outliers(ubi_rm = 3, div_rm = 3, msa = F, firm_n = 3)%>%
+  create_output(itr = 500)
+
+b <- a %>%
+  select(tech_name, ubi)%>%
+  unique()%>%
+  arrange(ubi)
+
+c <- a %>%
+  select(cbsa_name, div)%>%
+  unique()%>%
+  arrange(div)
+
 
 #--CAT EDA--------------------
+
 
 cat() <- unnest_tokens(cb_cbsa, tech_name, cat_detail, token = "regex", pattern = ",") %>%
   mutate(tech_name = trimws(tech_name)) %>%
