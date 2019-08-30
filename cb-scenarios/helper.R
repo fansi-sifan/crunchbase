@@ -7,15 +7,18 @@ clean_cat <- function(df, min, max) {
   df %>%
     unnest_tokens(tech_name, cat_detail, token = "regex", pattern = ",") %>%
     mutate(tech_name = trimws(tech_name)) %>%
+    # number of companies tagged with each technlogy category in the US
     group_by(tech_name) %>%
-    mutate(n = dplyr::n()) %>%
-    filter(n >= !!min) %>%
-    filter(n <= !!max)
+    mutate(tech_us_total = dplyr::n()) %>%
+    # take out rare or too broad categories
+    filter(tech_us_total >= !!min) %>%
+    filter(tech_us_total <= !!max)
 }
 
 
 calculate_LQ_alt <- function(df) {
   df %>%
+    # 
     mutate(us_total = sum(n)) %>%
     group_by(tech_name) %>%
     mutate(
@@ -26,7 +29,8 @@ calculate_LQ_alt <- function(df) {
     mutate(tech_msa_share = n / sum(n)) %>%
     mutate(
       lq = tech_msa_share / tech_us_share,
-      LQ = n * lq / us_total * 10000
+      # weigh in absolute size of local cluster
+      LQ = tech_msa_share * (n/tech_us_total)
     ) %>%
     arrange(-lq) %>%
     ungroup()
@@ -34,19 +38,21 @@ calculate_LQ_alt <- function(df) {
 
 calculate_LQ <- function(df) {
   df %>%
+    # n = number of companies tagged with each technology in each metro
     group_by(cbsa_code, cbsa_name, tech_name) %>%
     dplyr::count() %>%
     ungroup() %>%
     calculate_LQ_alt()
 }
 
-calculate_zLQ <- function(df) {
+calculate_SLQ <- function(df) {
   df %>%
-    # group_by(tech_name) %>%
+    group_by(tech_name) %>%
     mutate(
-      z_LQ = (LQ - mean(LQ)) / sd(LQ),
-      z_lq = (lq - mean(lq)) / sd(lq)
-    )
+      SLQ = (LQ - mean(LQ)) / sd(LQ),
+      slq = (lq - mean(lq)) / sd(lq)
+    ) %>%
+    filter(!is.na(SLQ)&!is.na(slq))
   # a place has Relative Technological Advantage (RTA) when LQ > 1
   # filter(lq > z_score)
 }
@@ -57,14 +63,14 @@ bootstrap_SLQ <- function(df) {
 
 calculate_tci <- function(df, method = "lq") {
   df %>%
-    mutate(
-      is.RCA_LQ = ifelse(z_LQ >= 1.96, T, F),
-      is.RCA_lq = ifelse(z_lq >= 1.96, T, F),
-      is.lq = ifelse(lq > 1, T, F)
-    ) %>%
-    {
-      if (method == "LQ") filter(., is.RCA_LQ) else filter(., is.lq)
-    } %>%
+    # mutate(
+    #   is.RCA_LQ = ifelse(z_LQ >= 1.96, T, F),
+    #   is.RCA_lq = ifelse(z_lq >= 1.96, T, F),
+    #   is.lq = ifelse(lq > 1, T, F)
+    # ) %>%
+    # {
+    #   if (method == "LQ") filter(., is.RCA_LQ) else filter(., is.lq)
+    # } %>%
 
     # calculate diversity -------
     group_by(cbsa_name, cbsa_code) %>%
