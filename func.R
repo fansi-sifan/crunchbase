@@ -103,7 +103,7 @@ match_cbsa <- function(){
   
   matched = address[[1]] %>%
     left_join(metro.data::county_cbsa_st, by = "stco_code") %>%
-    select(city_name, region_name, stco_code, cbsa_code, cbsa_name) %>%
+    select(city_name, region_name, stco_code, cbsa_code, cbsa_name, cbsa_pop) %>%
     unique()
   
   return(matched)
