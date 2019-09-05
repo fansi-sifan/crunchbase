@@ -18,7 +18,7 @@ clean_cat <- function(df, min, max) {
 clean_firms <- function(df, firm_n){
   df %>%
     group_by(cbsa_code, cbsa_name, cbsa_pop, tech_name) %>%
-    mutate(n = n()) %>%   # n = number of companies tagged with each technology in each metro
+    summarise(n = n()) %>%   # n = number of companies tagged with each technology in each metro
     ungroup() %>%
     filter( n >= !!firm_n)
 }
@@ -38,7 +38,7 @@ calculate_LQ <- function(df) {
     mutate(
       lq = tech_msa_share / tech_us_share,
       # weigh in absolute size of local cluster
-      LQ = tech_msa_share * (n/tech_us_total)
+      LQ = lq * n
     ) %>%
     arrange(-lq) %>%
     ungroup()
@@ -56,14 +56,14 @@ calculate_SLQ <- function(df) {
 
 }
 
-get_zscore <- function(df, col){
-  quantile(as.data.frame(df)[[col]], 0.5)
+get_zscore <- function(df, col, p){
+  quantile(as.data.frame(df)[[col]], probs = p)
 }
 
-boots <- function(df,col, ...){
+boots <- function(df,col,p, ...){
   set.seed(20)
-  boo <- bootstraps(df, ...) %>%
-    mutate(value = map_dbl(splits, get_zscore, col))
+  boo <- rsample::bootstraps(df, ...) %>%
+    mutate(value = map_dbl(splits, get_zscore, col, p))
   
   df %>% 
     mutate(value = mean(boo$value))%>%
@@ -72,22 +72,25 @@ boots <- function(df,col, ...){
 }
 
 # bootstrap to get SLLQ
-get_SLLQ <- function(df, col){
+get_SLLQ <- function(df, col, p){
   bind_rows(df %>%
               group_by(tech_name)%>%
-              group_map(~ boots(.x,col, times = 9), keep = T))
+              # bootstrap within each group
+              dplyr::group_map(~ boots(.x,col,p, times = 9), keep = T))
 }
 
-calculate_tci <- function(df, method = "lq") {
+calculate_tci <- function(df, method= "lq") {
   df %>%
-    # mutate(
-    #   is.RCA_LQ = ifelse(z_LQ >= 1.96, T, F),
-    #   is.RCA_lq = ifelse(z_lq >= 1.96, T, F),
-    #   is.lq = ifelse(lq > 1, T, F)
-    # ) %>%
-    # {
-    #   if (method == "LQ") filter(., is.RCA_LQ) else filter(., is.lq)
-    # } %>%
+    mutate(
+      is.RCA_SLQ = ifelse(SLQ >= z_SLQ, T, F),
+      is.RCA_slq = ifelse(slq >= z_slq, T, F),
+      is.RCA_lq = ifelse(lq > 1, T, F)
+    ) %>%
+    {
+      if (method == "SLQ") filter(., is.RCA_SLQ) 
+      else if (method == "slq") filter(., is.RCA_slq)
+      else filter(., is.RCA_lq)
+    } %>%
 
     # calculate diversity -------
     group_by(cbsa_name, cbsa_code, cbsa_pop) %>%
@@ -97,6 +100,7 @@ calculate_tci <- function(df, method = "lq") {
     mutate(ubi = dplyr::n()) %>%
     ungroup()
 }
+
 
 remove_outliers <- function(df, ubi_rm, div_rm, msa = TRUE) {
   df %>%
@@ -204,5 +208,5 @@ create_network <- function(df, freq, metro_name) {
 Plot_network <- function(nw) {
   # plot(test.gr)
   visNetwork(nw$nodes, nw$edges) %>%
-    visIgraphLayout()
+    visIgraphLayout(randomSeed = 23)
 }
