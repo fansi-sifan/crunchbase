@@ -1,4 +1,4 @@
-
+library(rsample)
 library(visNetwork)
 library(igraph)
 
@@ -15,8 +15,15 @@ clean_cat <- function(df, min, max) {
     filter(tech_us_total <= !!max)
 }
 
+clean_firms <- function(df, firm_n){
+  df %>%
+    group_by(cbsa_code, cbsa_name, cbsa_pop, tech_name) %>%
+    mutate(n = n()) %>%   # n = number of companies tagged with each technology in each metro
+    ungroup() %>%
+    filter( n >= !!firm_n)
+}
 
-calculate_LQ_alt <- function(df) {
+calculate_LQ <- function(df) {
   df %>%
     # 
     mutate(us_total = sum(n)) %>%
@@ -25,8 +32,9 @@ calculate_LQ_alt <- function(df) {
       tech_us_total = sum(n),
       tech_us_share = tech_us_total / us_total
     ) %>%
-    group_by(cbsa_code, cbsa_name) %>%
-    mutate(tech_msa_share = n / sum(n)) %>%
+    group_by(cbsa_code, cbsa_name, cbsa_pop) %>%
+    mutate(msa_total = sum(n),
+           tech_msa_share = n / msa_total) %>%
     mutate(
       lq = tech_msa_share / tech_us_share,
       # weigh in absolute size of local cluster
@@ -36,14 +44,6 @@ calculate_LQ_alt <- function(df) {
     ungroup()
 }
 
-calculate_LQ <- function(df) {
-  df %>%
-    # n = number of companies tagged with each technology in each metro
-    group_by(cbsa_code, cbsa_name, tech_name) %>%
-    dplyr::count() %>%
-    ungroup() %>%
-    calculate_LQ_alt()
-}
 
 calculate_SLQ <- function(df) {
   df %>%
@@ -53,12 +53,29 @@ calculate_SLQ <- function(df) {
       slq = (lq - mean(lq)) / sd(lq)
     ) %>%
     filter(!is.na(SLQ)&!is.na(slq))
-  # a place has Relative Technological Advantage (RTA) when LQ > 1
-  # filter(lq > z_score)
+
 }
 
-bootstrap_SLQ <- function(df) {
+get_zscore <- function(df, col){
+  quantile(as.data.frame(df)[[col]], 0.5)
+}
 
+boots <- function(df,col, ...){
+  set.seed(20)
+  boo <- bootstraps(df, ...) %>%
+    mutate(value = map_dbl(splits, get_zscore, col))
+  
+  df %>% 
+    mutate(value = mean(boo$value))%>%
+    select(tech_name, value)%>%
+    unique()
+}
+
+# bootstrap to get SLLQ
+get_SLLQ <- function(df, col){
+  bind_rows(df %>%
+              group_by(tech_name)%>%
+              group_map(~ boots(.x,col, times = 9), keep = T))
 }
 
 calculate_tci <- function(df, method = "lq") {
@@ -73,7 +90,7 @@ calculate_tci <- function(df, method = "lq") {
     # } %>%
 
     # calculate diversity -------
-    group_by(cbsa_name, cbsa_code) %>%
+    group_by(cbsa_name, cbsa_code, cbsa_pop) %>%
     mutate(div = dplyr::n()) %>%
     # calculate ubiquity --------
     group_by(tech_name) %>%
@@ -81,7 +98,7 @@ calculate_tci <- function(df, method = "lq") {
     ungroup()
 }
 
-remove_outliers <- function(df, ubi_rm, div_rm, firm_n, msa = TRUE) {
+remove_outliers <- function(df, ubi_rm, div_rm, msa = TRUE) {
   df %>%
 
     # remove technologies only claimed by one city
@@ -93,10 +110,9 @@ remove_outliers <- function(df, ubi_rm, div_rm, firm_n, msa = TRUE) {
     {
       if (msa) filter(., cbsa_code %in% cbsa_100) else filter(., !is.na(cbsa_code))
     } %>%
-    ungroup() %>%
-    filter(n > !!firm_n) %>%
+
     # recalculate diversity -------
-    group_by(cbsa_name, cbsa_code) %>%
+    group_by(cbsa_name, cbsa_code, cbsa_pop) %>%
     mutate(div = dplyr::n()) %>%
     # recalculate ubiquity --------
     group_by(tech_name) %>%
