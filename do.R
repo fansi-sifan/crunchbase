@@ -40,14 +40,16 @@ cb_cbsa_cleaned <- cb_cbsa %>%
 
 # bootstrap
 output <- cb_cbsa_cleaned %>%
-  left_join(get_SLLQ(cb_cbsa_cleaned, "SLQ"), by = "tech_name")%>%
+  left_join(get_SLLQ(cb_cbsa_cleaned, "SLQ", 0.5), by = "tech_name")%>%
   rename(z_SLQ = value)%>%
-  left_join(get_SLLQ(cb_cbsa_cleaned, "slq"), by = "tech_name")%>%
-  rename(z_slq = value) %>% ungroup() %>%
+  left_join(get_SLLQ(cb_cbsa_cleaned, "slq", 0.5), by = "tech_name")%>%
+  rename(z_slq = value) %>% 
+  ungroup() %>%
   calculate_tci(method = "SLQ")   # calculate tech complexity index
 
 # create index ---------------
 final <- output %>%
+  # remove_outliers(ubi_rm = 3, div_rm = 3) %>%
   create_output(itr = 500)
 
 # visuzalize network ---------
