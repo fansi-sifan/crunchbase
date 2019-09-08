@@ -28,6 +28,7 @@ cb_cbsa <- companies %>%
 
 # data analysis =================================
 load("cb-scenarios/data/cb_cbsa.rda")
+
 # define outliers ---------------------------------------------------
 cb_cbsa_cleaned <- cb_cbsa %>%
   # threshold for to qualify
@@ -36,24 +37,43 @@ cb_cbsa_cleaned <- cb_cbsa %>%
   
   # create indices
   calculate_LQ() %>%    # calculate lq and LQ ( = lq*n) by tech and city
-  calculate_SLQ()  # calculate standardized lq and LQ based on distribution
+  calculate_SLQ() %>% # calculate standardized lq and LQ based on distribution
+  ungroup()
 
-# bootstrap
-output <- cb_cbsa_cleaned %>%
-  left_join(get_SLLQ(cb_cbsa_cleaned, "SLQ", 0.5), by = "tech_name")%>%
-  rename(z_SLQ = value)%>%
-  left_join(get_SLLQ(cb_cbsa_cleaned, "slq", 0.5), by = "tech_name")%>%
-  rename(z_slq = value) %>% 
-  ungroup() %>%
-  calculate_tci(method = "SLQ")   # calculate tech complexity index
+# # bootstrap ================
+# cb_cbsa_cleaned <- cb_cbsa_cleaned %>%
+#   left_join(get_SLLQ(cb_cbsa_cleaned, "SLQ", 0.5), by = "tech_name")%>%
+#   rename(z_SLQ = value)%>%
+#   left_join(get_SLLQ(cb_cbsa_cleaned, "slq", 0.5), by = "tech_name")%>%
+#   rename(z_slq = value) %>% 
+#   ungroup() 
 
-# create index ---------------
-final <- output %>%
-  # remove_outliers(ubi_rm = 3, div_rm = 3) %>%
+# load("cb-scenarios/data/cbsa_100.rda")
+final <- cb_cbsa_cleaned %>%
+  calculate_tci() %>%
+  remove_outliers(ubi_rm = 3, div_rm = 3, msa = F) %>%
+  calculate_tci() 
+
+# # create index ---------------
+
+index <- final %>%
+  # calculate_tci(method = "SLQ")  # for bootstrap
   create_output(itr = 500)
 
+# visualize mean ubi --------
+name_labels <- c(
+                 "11180",   # Anes
+                 # "14460", # Boston
+                 # "35620", # New York
+                 "24860",   # Lousiville
+                 # '41940', # San Jose
+                 # '45060', # Syracuse
+                 "41860")
+
+plot_mean_ubi(final)
+
 # visuzalize network ---------
-output %>%
-  create_network(10, "Birmingham-Hoover, AL")%>%
+final %>%
+  create_network(20, "Birmingham-Hoover, AL")%>%
   Plot_network()
 
