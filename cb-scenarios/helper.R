@@ -151,15 +151,19 @@ create_output <- function(df, itr) {
 
 
 plot_mean_ubi <- function(df) {
+  df <-  df %>%
+    group_by(cbsa_code, cbsa_name, div) %>%
+    summarise(mean_ubi = sum(ubi / div))
   ggplot(
-    df %>%
-      group_by(cbsa_code, cbsa_name, div) %>%
-      summarise(mean_ubi = sum(ubi / div)),
-    aes(x = div, y = mean_ubi, label = cbsa_name)
-  ) +
-    geom_point(stat = "identity") +
-    geom_vline(aes(xintercept = mean(div)), color = "red") +
-    geom_hline(aes(yintercept = mean(mean_ubi)), color = "red")
+    df,aes(x = div, y = mean_ubi, label = cbsa_name)) +
+    annotate("rect", xmin = -Inf, xmax = mean(df$div), ymin = -Inf, ymax = mean(df$mean_ubi), fill= "#99d8c9")  + 
+    annotate("rect", xmin = -Inf, xmax = mean(df$div), ymin = mean(df$mean_ubi), ymax = Inf , fill= "#e5f5f9") + 
+    annotate("rect", xmin = mean(df$div), xmax = Inf, ymin = -Inf, ymax = mean(df$mean_ubi), fill= "#66c2a4") + 
+    annotate("rect", xmin = mean(df$div), xmax = Inf, ymin = mean(df$mean_ubi), ymax = Inf , fill= "white") +
+    geom_point(stat = "identity",  color = "#2c7fb8") +
+    geom_vline(aes(xintercept = mean(div)), color = "#F8F9F9") +
+    geom_hline(aes(yintercept = mean(mean_ubi)), color = "#F8F9F9") +
+    ggrepel::geom_text_repel(data = df %>% filter(cbsa_code %in% name_labels), mapping = aes(x = div, y = mean_ubi, label = cbsa_name))
 }
 
 
