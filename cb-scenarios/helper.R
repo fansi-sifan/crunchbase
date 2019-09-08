@@ -79,24 +79,19 @@ get_SLLQ <- function(df, col, p){
               dplyr::group_map(~ boots(.x,col,p, times = 9), keep = T))
 }
 
-calculate_tci <- function(df, method= "lq") {
+calculate_tci <- function(df, method = "lq") {
   df %>%
-    mutate(
-      is.RCA_SLQ = ifelse(SLQ >= z_SLQ, T, F),
-      is.RCA_slq = ifelse(slq >= z_slq, T, F),
-      is.RCA_lq = ifelse(lq > 1, T, F)
-    ) %>%
     {
-      if (method == "SLQ") filter(., is.RCA_SLQ) 
-      else if (method == "slq") filter(., is.RCA_slq)
-      else filter(., is.RCA_lq)
+      if (method == "SLQ") filter(., SLQ >= z_SLQ) 
+      else if (method == "slq") filter(., slq >= z_slq)
+      else filter(., lq > 1)
     } %>%
-
+    
     # calculate diversity -------
-    group_by(cbsa_name, cbsa_code, cbsa_pop) %>%
+  group_by(cbsa_name, cbsa_code, cbsa_pop) %>%
     mutate(div = dplyr::n()) %>%
     # calculate ubiquity --------
-    group_by(tech_name) %>%
+  group_by(tech_name) %>%
     mutate(ubi = dplyr::n()) %>%
     ungroup()
 }
@@ -168,9 +163,10 @@ plot_mean_ubi <- function(df) {
 }
 
 
+# https://www.jessesadler.com/post/network-analysis-with-r/
 create_network <- function(df, freq, metro_name) {
   tech_long <- df %>%
-    select(cbsa_name, tech_name, n)
+    select(cbsa_name, tech_name, n) 
 
   w <- tech_long %>%
     reshape2::dcast(tech_name ~ cbsa_name)
@@ -179,6 +175,7 @@ create_network <- function(df, freq, metro_name) {
   x[is.na(x)] <- 0
   x <- apply(x, 2, function(x) as.numeric(x > 0)) # recode as 0/1
   v <- x %*% t(x) # the magic matrix
+  
   # d <- diag(v)
   diag(v) <- 0 # repalce diagonal
   dimnames(v) <- list(w[, 1], w[, 1]) # name the dimensions
@@ -187,19 +184,22 @@ create_network <- function(df, freq, metro_name) {
   # t <- v / d # min?
 
   # test.gr <- igraph::graph_from_adjacency_matrix(v, mode = "undirected", weighted = T)
-  edges <- as.data.frame(as.table(v)) %>% filter(Freq > !!freq)
+  edges <- as.data.frame(as.table(v)) %>% 
+    filter(Freq > !!freq)
   colnames(edges) <- c("from", "to", "value")
 
   # test.visn <- toVisNetworkData(test.gr)
-  msa_space <- (df %>% filter(cbsa_name == !!metro_name))$tech_name
+  msa_space <- tech_long %>% filter(cbsa_name == !!metro_name)
   nodes <- bind_rows(
     edges %>% select(id = from),
     edges %>% select(id = to)
   ) %>%
+    left_join(msa_space, by = c("id" = "tech_name")) %>%
     unique() %>%
     mutate(
       label = id,
-      color.background = ifelse(label %in% msa_space, "blue", "grey")
+      value = n,
+      color.background = ifelse(!is.na(value), "blue", "grey")
     )
 
   return(list("edges" = edges, "nodes" = nodes))
