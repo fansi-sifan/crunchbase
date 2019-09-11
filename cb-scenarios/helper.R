@@ -202,8 +202,8 @@ create_network <- function(df, freq, metro_name) {
     unique() %>%
     mutate(
       label = id,
-      value = n,
-      color.background = ifelse(!is.na(value), "blue", "grey")
+      color.background = ifelse(!is.na(n), "blue", "grey"),
+      value = ifelse(is.na(n),0.5,n)
     )
 
   return(list("edges" = edges, "nodes" = nodes))
