@@ -1,4 +1,4 @@
-source("do.R")
+source("4_do.R")
 
 library(sf)
 library(ggplot2)
@@ -34,7 +34,16 @@ index_cbsa <- index %>%
   unique()%>%
   arrange(-div)
 
-index_cbsa
+# output <- index_cbsa %>%
+#   left_join(index_cbsa_base, by = "GEOID")
+
+p <- ggplot(output, aes(x = div.y, y = div.x-div.y, label = cbsa_name.x))+
+  scale_x_continuous("SCI(1999 - 2008)")+
+  scale_y_continuous("Differences between SCI(2009 - 2018) and SCI(1999 - 2008)") +
+  geom_point(stat = "identity")+
+  geom_smooth(method = "lm")
+
+plotly::ggplotly(p)
 
 # visualize mean ubi --------
 name_labels <- c(
@@ -47,7 +56,6 @@ name_labels <- c(
   "41860")
 
 plot_mean_ubi(final)
-
 
 
 # bubble map -----------
@@ -66,10 +74,13 @@ map_data <- index_cbsa %>%
 # geom_sf -----------
 gmap <- ggplot()+
   geom_sf(data = st, color = "grey", fill = "#D6D6D6")+
-  geom_sf(data = map_data,aes(size = pc_tech, color = div, label = NAME))+
-  scale_color_distiller(palette = "RdBu", direction = 1,"Startup Complexity Index")+
+  geom_sf(data = map_data,aes(size = pc_tech, color = div, label = NAME), 
+          show.legend = 'point')+
+  scale_size_continuous(name = "Number of young firms per 1000 residents", range = c(2,20))+
+  scale_color_distiller(palette = "RdYlBu", direction = 1,name = "Startup Complexity Index")+
   coord_sf(crs = 2163)+
-  ggthemes::theme_map()
+  ggthemes::theme_map()+
+  theme( legend.position = "bottom")
 
 gmap
 
@@ -88,8 +99,11 @@ plotly::ggplotly(gmap)
 # 
 # tmap
 
-# matrix -----------
-
+# case -----------
+final %>%
+  filter(cbsa_code=="13820")%>%
+  select(tech_name,n,lq,LQ, SLQ)%>%
+  View()
 
 
 

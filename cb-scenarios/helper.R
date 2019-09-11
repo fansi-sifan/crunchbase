@@ -1,6 +1,8 @@
+library(tidytext)
 library(rsample)
 library(visNetwork)
 library(igraph)
+library(dplyr)
 
 
 clean_cat <- function(df, min, max) {
@@ -212,5 +214,9 @@ create_network <- function(df, freq, metro_name) {
 Plot_network <- function(nw) {
   # plot(test.gr)
   visNetwork(nw$nodes, nw$edges) %>%
-    visIgraphLayout(randomSeed = 23)
+    visIgraphLayout(randomSeed = 2)
 }
+
+final %>%
+  create_network(10, "Birmingham-Hoover, AL")%>%
+  Plot_network()
