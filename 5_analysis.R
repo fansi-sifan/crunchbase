@@ -2,7 +2,7 @@ source("4_do.R")
 
 library(sf)
 library(ggplot2)
-library(tmap)
+
 
 # Summary Statistics --------
 count_unique <- function(vector){
@@ -37,13 +37,13 @@ index_cbsa <- index %>%
 # output <- index_cbsa %>%
 #   left_join(index_cbsa_base, by = "GEOID")
 
-p <- ggplot(output, aes(x = div.y, y = div.x-div.y, label = cbsa_name.x))+
-  scale_x_continuous("SCI(1999 - 2008)")+
-  scale_y_continuous("Differences between SCI(2009 - 2018) and SCI(1999 - 2008)") +
-  geom_point(stat = "identity")+
-  geom_smooth(method = "lm")
-
-plotly::ggplotly(p)
+# p <- ggplot(output, aes(x = div.y, y = div.x-div.y, label = cbsa_name.x))+
+#   scale_x_continuous("SCI(1999 - 2008)")+
+#   scale_y_continuous("Differences between SCI(2009 - 2018) and SCI(1999 - 2008)") +
+#   geom_point(stat = "identity")+
+#   geom_smooth(method = "lm")
+# 
+# plotly::ggplotly(p)
 
 # visualize mean ubi --------
 name_labels <- c(
@@ -55,7 +55,7 @@ name_labels <- c(
   # '45060', # Syracuse
   "41860")
 
-plot_mean_ubi(final)
+plot_mean_ubi(final,func = T)
 
 
 # bubble map -----------
@@ -87,6 +87,7 @@ gmap
 plotly::ggplotly(gmap)
 
 # tmap -------------
+# library(tmap)
 # tmap <- tm_shape(st, projection = 2163) +
 #   tm_polygons(border.col = "grey", col = "#D6D6D6") +
 #   tm_shape(map_data, projection = 2163) +
@@ -99,13 +100,11 @@ plotly::ggplotly(gmap)
 # 
 # tmap
 
-# case -----------
+# case study -----------
 final %>%
   filter(cbsa_code=="13820")%>%
   select(tech_name,n,lq,LQ, SLQ)%>%
   View()
-
-
 
 # visuzalize network ---------
 final %>%

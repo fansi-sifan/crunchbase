@@ -235,6 +235,3 @@ Plot_network <- function(nw) {
     visIgraphLayout(randomSeed = 2)
 }
 
-final %>%
-  create_network(10, "Birmingham-Hoover, AL")%>%
-  Plot_network()
