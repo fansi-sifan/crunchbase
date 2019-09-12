@@ -1,9 +1,8 @@
 library(lubridate)
-library(tidyverse)
-library(tidytext)
+library(dplyr)
 library(skimr)
 
-source("cb-scenarios/helper.R")
+
 
 clean_cols <- function(df) {
   df %>%

@@ -1,6 +1,8 @@
+library(tidytext)
 library(rsample)
 library(visNetwork)
 library(igraph)
+library(dplyr)
 
 
 clean_cat <- function(df, min, max) {
@@ -220,8 +222,8 @@ create_network <- function(df, freq, metro_name) {
     unique() %>%
     mutate(
       label = id,
-      value = n,
-      color.background = ifelse(!is.na(value), "blue", "grey")
+      color.background = ifelse(!is.na(n), "blue", "grey"),
+      value = ifelse(is.na(n),0.5,n)
     )
 
   return(list("edges" = edges, "nodes" = nodes))
@@ -230,5 +232,9 @@ create_network <- function(df, freq, metro_name) {
 Plot_network <- function(nw) {
   # plot(test.gr)
   visNetwork(nw$nodes, nw$edges) %>%
-    visIgraphLayout(randomSeed = 23)
+    visIgraphLayout(randomSeed = 2)
 }
+
+final %>%
+  create_network(10, "Birmingham-Hoover, AL")%>%
+  Plot_network()
