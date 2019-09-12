@@ -150,7 +150,7 @@ create_output <- function(df, itr) {
 }
 
 
-plot_mean_ubi <- function(df) {
+plot_mean_ubi <- function(df, func = F) {
   df <-  df %>%
     group_by(cbsa_code, cbsa_name, div) %>%
     summarise(mean_ubi = sum(ubi / div))
@@ -168,16 +168,20 @@ plot_mean_ubi <- function(df) {
     geom_hline(aes(yintercept = mean(mean_ubi)), color = "#F8F9F9") +
     ggrepel::geom_text_repel(data = df %>% filter(cbsa_code %in% name_labels), mapping = aes(x = div, y = mean_ubi, label = cbsa_name))
   
-  lm_eqn <- function(df){
-    m <- lm(mean_ubi ~ div + log(div), df);
-    eq <- substitute(italic(mean_ubi) == a + b %.% italic(log(div))*","~~italic(r)^2~"="~r2, 
-                     list(a = format(unname(coef(m)[1]), digits = 2),
-                          b = format(unname(coef(m)[2]), digits = 2),
-                          r2 = format(summary(m)$r.squared, digits = 3)))
-    as.character(as.expression(eq));
-  }
+  if (func){
+    
+    lm_eqn <- function(df){
+      m <- lm(mean_ubi ~ div + log(div), df);
+      eq <- substitute(italic(mean_ubi) == a + b %.% italic(log(div))*","~~italic(r)^2~"="~r2, 
+                       list(a = format(unname(coef(m)[1]), digits = 2),
+                            b = format(unname(coef(m)[2]), digits = 2),
+                            r2 = format(summary(m)$r.squared, digits = 3)))
+      as.character(as.expression(eq));
+    }
+    
+    p + geom_text(x = 200, y = 50, label = lm_eqn(df), parse = TRUE)
+  } else p
   
-  p + geom_text(x = 200, y = 50, label = lm_eqn(df), parse = TRUE)
 }
 
 
