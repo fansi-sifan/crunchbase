@@ -102,7 +102,7 @@ plotly::ggplotly(gmap)
 
 # case study -----------
 final %>%
-  filter(cbsa_code=="13820")%>%
+  filter(cbsa_code =="13820")%>%
   select(tech_name,n,lq,LQ, SLQ)%>%
   View()
 
