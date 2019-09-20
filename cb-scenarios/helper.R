@@ -170,7 +170,7 @@ plot_mean_ubi <- function(df, func = F) {
     geom_hline(aes(yintercept = mean(mean_ubi)), color = "#F8F9F9") +
     ggrepel::geom_text_repel(data = df %>% filter(cbsa_code %in% name_labels), mapping = aes(x = div, y = mean_ubi, label = cbsa_name))
   
-  if (func){
+  chart <- if (func){
     
     lm_eqn <- function(df){
       m <- lm(mean_ubi ~ div + log(div), df);
@@ -183,6 +183,8 @@ plot_mean_ubi <- function(df, func = F) {
     
     p + geom_text(x = 200, y = 50, label = lm_eqn(df), parse = TRUE)
   } else p
+  
+  return(list(df, chart))
   
 }
 
