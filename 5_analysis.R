@@ -3,7 +3,6 @@ source("4_do.R")
 library(sf)
 library(ggplot2)
 
-
 # Summary Statistics --------
 count_unique <- function(vector){
   length(unique(vector[!is.na(vector)]))
@@ -23,10 +22,18 @@ cb_cbsa %>%
 
 final %>%
   mutate(pct_tech = msa_total/us_total)%>% 
-  arrange(-div)%>%
-  select(cbsa_name, pct_tech, div)%>%
+  select(cbsa_name, pct_tech, div, n)%>%
   unique()%>%
-  head(10)
+  # arrange(-div)
+  arrange(div)%>%
+  head(20)
+
+final %>%
+  select(tech_name, ubi)%>%
+  unique()%>%
+  # arrange(-ubi)
+  arrange(ubi)%>%
+  View()
 
 index_cbsa <- index %>%
   mutate(pc_tech = msa_total/cbsa_pop*1000)%>%
@@ -34,16 +41,7 @@ index_cbsa <- index %>%
   unique()%>%
   arrange(-div)
 
-# output <- index_cbsa %>%
-#   left_join(index_cbsa_base, by = "GEOID")
 
-# p <- ggplot(output, aes(x = div.y, y = div.x-div.y, label = cbsa_name.x))+
-#   scale_x_continuous("SCI(1999 - 2008)")+
-#   scale_y_continuous("Differences between SCI(2009 - 2018) and SCI(1999 - 2008)") +
-#   geom_point(stat = "identity")+
-#   geom_smooth(method = "lm")
-# 
-# plotly::ggplotly(p)
 
 # visualize mean ubi --------
 name_labels <- c(
@@ -55,8 +53,23 @@ name_labels <- c(
   # '45060', # Syracuse
   "41860")
 
-plot_mean_ubi(final,func = T)
+chart_output <- plot_mean_ubi(final,func = F)
 
+plotly::ggplotly(chart_output[[2]])
+
+load("../metro-dataset/metro_monitor_2019/cbsa_metromonitor.rda")
+
+# output per job for each quardrant
+chart_output[[1]] %>%
+  left_join(cbsa_metromonitor, by = "cbsa_code")%>%
+  mutate(type = case_when(
+    mean_ubi > 44.51225 & div < 34.24167 ~ "2",
+    mean_ubi < 44.51225 & div < 34.24167~ "3",
+    div > 34.24167 ~ "1"
+  )) %>%
+  group_by(type)%>%
+  summarise(output_per_job = weighted.mean(output_per_job, jobs, na.rm = T), 
+            count = n())
 
 # bubble map -----------
 # get centroids from cbsa shapes
@@ -78,9 +91,9 @@ gmap <- ggplot()+
           show.legend = 'point')+
   scale_size_continuous(name = "Number of young firms per 1000 residents", range = c(2,20))+
   scale_color_distiller(palette = "RdYlBu", direction = 1,name = "Startup Complexity Index")+
-  coord_sf(crs = 2163)+
+  coord_sf(crs = 102009)+
   ggthemes::theme_map()+
-  theme( legend.position = "bottom")
+  theme(legend.position = "bottom")
 
 gmap
 
@@ -99,6 +112,71 @@ plotly::ggplotly(gmap)
 # tmap_mode("plot")
 # 
 # tmap
+
+# regression -----------
+# time series
+new <- index 
+load("data/cb_cbsa_old.rda")
+# run  "3_clean.R", change the year range
+old <- index
+# save(old, file = "data/cb_cbsa_old.rda")
+
+output <- old %>%
+  select(cbsa_code,sci09=div) %>%
+  unique()%>%
+  left_join(new %>%
+              select(cbsa_code, cbsa_name, sci19 = div)%>%
+              unique(), by = "cbsa_code") %>%
+  mutate(pct_div = sci19/sci09-1,
+         abs_div = sci19-sci09)
+
+p <- ggplot(output, aes(x = sci09, y = pct_div, label = cbsa_name))+
+  scale_x_continuous("SCI(1999 - 2008)")+
+  scale_y_continuous("Percentage change between SCI(2009 - 2018) and SCI(1999 - 2008)") +
+  geom_point(stat = "identity")+
+  geom_smooth(method = "lm", formula = y~log(x)+x)
+
+p
+
+plotly::ggplotly(p)
+
+
+# economic index
+
+load("../metro-dataset/patent_complexity/cbsa_patentcomplex.rda")
+load("../metro-dataset/census/cbsa_acs.rda")
+
+
+cbsa_ECI <- read.csv("data/Metro_ECI_SI.csv") %>%
+  mutate(cbsa_code = as.character(msa)) %>%
+  select(-contains("msa"),-X)
+
+output <- output %>%
+  left_join(cbsa_acs[c("cbsa_code", "pct_hs", "pct_somecollege","pct_associate","pct_ba", "pct_grad")], by = "cbsa_code")%>%
+  left_join(cbsa_patentcomplex, by = "cbsa_code") %>%
+  left_join(cbsa_metromonitor, by = "cbsa_code") %>%
+  left_join(cbsa_ECI, by = "cbsa_code")
+
+ggplot(output, aes(x = sci19, y = output_per_job))+
+  geom_point(stat = "identity") +
+  geom_smooth(method = "lm")
+
+fit <- lm(output_per_job/1000 ~ eci + patent_complexity + sci19 + jobs + pct_ba+pct_grad,output)
+summary(fit)
+reg_output <- broom::tidy(fit)
+
+cor(output$patent_complexity,output$sci19, 'pairwise')
+cor(output$output_per_job,output$sci19, 'pairwise')
+
+# plot --
+library(corrplot)
+M <- cor(output%>%
+           select_if(is.numeric)%>%
+           select(-contains("rank"), - contains("ratio"), - count, -sci09, -contains("_div")),use = "pairwise.complete.obs")
+
+corrplot(M, method = "color", type ="upper",
+         addCoef.col = "black", tl.col = "black",tl.srt=45)
+
 
 # case study -----------
 final %>%
