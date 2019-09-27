@@ -13,12 +13,17 @@ cat("total number of innovation categoriess is:",count_unique(cb_cbsa_cleaned$te
 cat("total number of metros is:",count_unique(cb_cbsa$cbsa_name))
 cat("total number of metros after removing outliers is:",count_unique(final$cbsa_name))
 
-cb_cbsa %>%
-  group_by(cbsa_name)%>%
+tmp <- cb_cbsa %>%
+  group_by(cbsa_code)%>%
   summarise(n = n()) %>%
   mutate(pct_firms = n/sum(n))%>%
   arrange(-pct_firms)%>%
-  head(6)
+  left_join(index_cbsa, by = c("cbsa_code" = "GEOID")) %>%
+  left_join(final %>% 
+              select(cbsa_code, div)%>%
+              unique(), by = "cbsa_code")
+
+write.csv(tmp, "tmp.csv")
 
 # top 
 final %>%
@@ -44,7 +49,9 @@ index_cbsa <- index %>%
   mutate(SCI = div/max(div))
 
 
-index_cbsa %>% arrange(div)
+index_cbsa %>% 
+  arrange(-div)
+  # arrange(div)
 
 # visualize mean ubi --------
 name_labels <- c(
