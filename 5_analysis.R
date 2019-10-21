@@ -13,33 +13,21 @@ cat("total number of innovation categoriess is:",count_unique(cb_cbsa_cleaned$te
 cat("total number of metros is:",count_unique(cb_cbsa$cbsa_name))
 cat("total number of metros after removing outliers is:",count_unique(final$cbsa_name))
 
-tmp <- cb_cbsa %>%
-  group_by(cbsa_code)%>%
-  summarise(n = n()) %>%
-  mutate(pct_firms = n/sum(n))%>%
-  arrange(-pct_firms)%>%
-  left_join(index_cbsa, by = c("cbsa_code" = "GEOID")) %>%
-  left_join(final %>% 
-              select(cbsa_code, div)%>%
-              unique(), by = "cbsa_code")
-
-write.csv(tmp, "tmp.csv")
-
 # top 
 final %>%
+  filter(!is.na(cbsa_name))%>%
   mutate(pct_tech = msa_total/us_total)%>% 
   select(cbsa_name, pct_tech, div)%>%
   unique()%>%
-  # arrange(-div)%>%
-  arrange(div)%>%
+  arrange(-div)%>%
+  # arrange(div)%>%
   head(20)
 
 final %>%
   select(tech_name, ubi)%>%
   unique()%>%
   # arrange(-ubi)
-  arrange(ubi)%>%
-  View()
+  arrange(ubi)
 
 index_cbsa <- index %>%
   mutate(pc_tech = msa_total/cbsa_pop*1000)%>%
@@ -52,6 +40,18 @@ index_cbsa <- index %>%
 index_cbsa %>% 
   arrange(-div)
   # arrange(div)
+
+tmp <- cb_cbsa %>%
+  group_by(cbsa_code)%>%
+  summarise(n = n()) %>%
+  mutate(pct_firms = n/sum(n))%>%
+  arrange(-pct_firms)%>%
+  left_join(index_cbsa, by = c("cbsa_code" = "GEOID")) %>%
+  left_join(final %>% 
+              select(cbsa_code, div)%>%
+              unique(), by = "cbsa_code")
+
+# write.csv(index, "city_tech_complexity.csv")
 
 # visualize mean ubi --------
 name_labels <- c(
@@ -112,6 +112,8 @@ gmap
 
 plotly::ggplotly(gmap)
 
+# write.csv(index_cbsa, "SCI_map.csv")
+
 # [DEPRECIATED]tmap -------------
 # library(tmap)
 # tmap <- tm_shape(st, projection = 2163) +
@@ -143,6 +145,7 @@ output <- old %>%
   mutate(pct_div = sci19/sci09-1,
          abs_div = sci19-sci09)
 
+# u shape trend line
 p <- ggplot(output, aes(x = sci09, y = pct_div, label = cbsa_name))+
   scale_x_continuous("SCI(1999 - 2008)")+
   scale_y_continuous("Percentage change between SCI(2009 - 2018) and SCI(1999 - 2008)") +
@@ -154,6 +157,21 @@ p
 
 plotly::ggplotly(p)
 
+# column chart
+df <- output %>%
+  filter(!is.na(sci09))%>%
+  mutate(bins = cut(.$sci09,breaks = c(12,41, 75, 97), 
+                    labels = c("Low", "Medium", "High"))) %>%
+  group_by(bins)%>%
+  # filter(!is.na(bins))%>%
+  summarise(pct_change = mean(pct_div, na.rm = T),
+            sci09 = mean(sci09,na.rm = T),
+            sci19 = mean(sci))
+
+df
+
+ggplot(df, aes(x = bins, y = pct_change))+
+  geom_bar(stat = "identity")
 
 # economic index
 
