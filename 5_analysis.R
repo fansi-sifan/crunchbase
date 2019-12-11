@@ -29,17 +29,7 @@ final %>%
   # arrange(-ubi)
   arrange(ubi)
 
-index_cbsa <- index %>%
-  mutate(pc_tech = msa_total/cbsa_pop*1000)%>%
-  select(GEOID = cbsa_code, cbsa_name, div, pc_tech) %>% 
-  unique()%>%
-  arrange(-div)%>%
-  mutate(SCI = div/max(div))
 
-
-index_cbsa %>% 
-  arrange(-div)
-  # arrange(div)
 
 tmp <- cb_cbsa %>%
   group_by(cbsa_code)%>%
@@ -68,6 +58,7 @@ chart_output <- plot_mean_ubi(final,func = F)
 plotly::ggplotly(chart_output[[2]])
 
 load("../metro-dataset/metro_monitor_2019/cbsa_metromonitor.rda")
+load("../metro-dataset/vc/cbsa_vc.rda")
 
 cbsa_metromonitor <- cbsa_metromonitor %>%
   select(cbsa_code, output_per_job, median_income, average_annual_wage,jobs, value_year) %>% unique()
@@ -94,6 +85,16 @@ cbsa <- read_sf(dsn = "V:/_metro_data_warehouse/data_spatial/shapefiles/2018/ins
 st <- read_sf(dsn = "V:/_metro_data_warehouse/data_spatial/shapefiles/2018/insets/states/low_definition", layer = "states51_inset_ld")
 
 # merge data with geometry
+
+index_cbsa <- index %>%
+  mutate(pc_tech = msa_total/cbsa_pop*1000)%>%
+  select(cbsa_code, cbsa_name, div, pc_tech) %>% 
+  unique()%>%
+  arrange(-div)%>%
+  mutate(SCI = div/max(div))%>%
+  left_join(cbsa_vc, by = "cbsa_code")%>%
+  rename(GEOID = cbsa_code)
+  
 map_data <- index_cbsa %>%
   merge(cbsa,.)
 
@@ -166,9 +167,7 @@ df <- output %>%
   # filter(!is.na(bins))%>%
   summarise(pct_change = mean(pct_div, na.rm = T),
             sci09 = mean(sci09,na.rm = T),
-            sci19 = mean(sci))
-
-df
+            sci19 = mean(sci19,na.rm =) )
 
 ggplot(df, aes(x = bins, y = pct_change))+
   geom_bar(stat = "identity")
@@ -178,6 +177,7 @@ ggplot(df, aes(x = bins, y = pct_change))+
 load("../metro-dataset/patent_complexity/cbsa_patentcomplex.rda")
 load("../metro-dataset/acs5_2017/cbsa_acs.rda")
 
+
 cbsa_ECI <- read.csv("data/Metro_ECI_SI.csv") %>%
   mutate(cbsa_code = as.character(msa)) %>%
   select(-contains("msa"),-X)
@@ -186,7 +186,8 @@ output <- output %>%
   left_join(cbsa_acs[c("cbsa_code", "pct_edu_baplus")], by = "cbsa_code")%>%
   left_join(cbsa_patentcomplex, by = "cbsa_code") %>%
   left_join(cbsa_metromonitor, by = "cbsa_code") %>%
-  left_join(cbsa_ECI, by = "cbsa_code")
+  left_join(cbsa_ECI, by = "cbsa_code") %>%
+  left_join(cbsa_vc, by = "cbsa_code")
 
 p1 <- ggplot(output, aes(x = sci19, y = output_per_job))+
   geom_point(stat = "identity") +
@@ -198,10 +199,27 @@ p2 <- ggplot(output, aes(x = sci19, y = median_income))+
   geom_smooth(method = "lm")+ 
   theme_classic()
 
+
 gridExtra::grid.arrange(p1,p2, ncol=2)
 
-fit <- lm(output_per_job/1000 ~ eci + patent_complexity + sci19 + jobs + pct_edu_ba+pct_edu_grad,output)
+plot_scatter <- function(data, var_x, var_y, label){
+  var_x <- rlang::enquo(var_x)
+  var_y <- rlang::enquo(var_y)
+  label <- rlang::enquo(label)
+  
+  ggplot(data, aes_string(x = var_x, y = var_y, label = label))+
+    geom_point(stat = "identity") + 
+    geom_smooth(method = "lm")+
+    theme_classic()
+}
+
+plotly::ggplotly(plot_scatter(output, log(vc_per_m_pop), sci19, cbsa_name.x))
+
+
+fit <- lm(output_per_job/1000 ~ eci + patent_complexity + sci19 + jobs + pct_edu_baplus,output)
+fit <- lm(sci19 ~ eci + patent_complexity + jobs+ pct_edu_baplus + vc_per_m_pop,output)
 summary(fit)
+
 reg_output <- broom::tidy(fit)
 
 cor(output$median_income,output$sci19, 'pairwise')
@@ -217,6 +235,7 @@ cor(output$average_annual_wage,output$sci19, 'pairwise')
 cor(output$average_annual_wage,output$patent_complexity, 'pairwise')
 cor(output$average_annual_wage,output$pct_edu_baplus, 'pairwise')
 
+cor(output$vc_per_m_pop,output$sci19, 'pairwise')
 
 tmp <- data.frame("var" = c("Median income", "Output per job"), 
            "cor" = c(cor(output$median_income,output$sci19, 'pairwise'),cor(output$output_per_job,output$sci19, 'pairwise')))
@@ -229,8 +248,13 @@ ggplot(tmp, aes(x = var, y= cor, fill = cor))+
 library(corrplot)
 M <- cor(output%>%
            select_if(is.numeric)%>%
-           select(sci19, patent_complexity, pct_edu_ba, median_income, output_per_job, average_annual_wage, jobs, eci),use = "pairwise.complete.obs")
+           select(sci19, patent_complexity, pct_edu_baplus, median_income, output_per_job, average_annual_wage, jobs, eci, vc_per_m_pop),use = "pairwise.complete.obs")
 
+M <- cor(index_cbsa %>%
+           select_if(is.numeric) %>%
+           select(-div,-pc_tech),
+         use = "pairwise.complete.obs")
+         
 # correlation chart
 corrplot(M, method = "color", type ="upper",
          addCoef.col = "black", tl.col = "black",tl.srt=45)
