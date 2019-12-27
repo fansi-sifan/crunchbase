@@ -9,13 +9,13 @@ load("cb-scenarios/data/cb_cbsa.rda")
 cb_cleaned <- cb_cbsa %>%
   # threshold for to qualify
   clean_cat(min = 10, max = 5000) %>% # remove super rare or super broad categories (software = 4700)
-  clean_firms(firm_n = 4,cbsa_code, cbsa_name, cbsa_pop, tech_name) %>%   # technology needs at least 3 firms in the metro to qualify as RCA
+  clean_firms(firm_n = 4,cbsa_code) %>%   # technology needs at least 3 firms in the metro to qualify as RCA
 
   # replace stco_code with cbsa_code  
   # cbsa_code, cbsa_name, cbsa_pop, tech_name
   
   # create indices
-  calculate_LQ(cbsa_code, cbsa_name, cbsa_pop) %>%    # calculate lq and LQ ( = lq*n) by tech and city
+  calculate_LQ(cbsa_code) %>%    # calculate lq and LQ ( = lq*n) by tech and city
   calculate_SLQ() %>% # calculate standardized lq and LQ based on distribution
   ungroup()
 
@@ -31,7 +31,7 @@ cb_cleaned <- cb_cbsa %>%
 final <- cb_cleaned %>%
   # calculate_tci() %>%
   # remove_outliers(ubi_rm = 3, div_rm = 3, msa = F) %>%
-  calculate_tci(method = "lq", cbsa_code, cbsa_name, cbsa_pop) 
+  calculate_tci(method = "lq", cbsa_code) 
 
 # # create index ---------------
 

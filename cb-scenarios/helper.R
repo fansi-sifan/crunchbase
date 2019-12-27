@@ -18,28 +18,41 @@ clean_cat <- function(df, min, max) {
     ungroup()
 }
 
-clean_firms <- function(df, firm_n, ...){
+clean_firms <- function(df, firm_n, target){
+  
+  # target <- rlang::enquo(target)
+  
   df %>%
-    group_by(...) %>%
+    group_by(!!target) %>%
+    group_by(tech_name, add = T)%>%
     summarise(n = n()) %>%   # n = number of companies tagged with each technology in each metro
     ungroup() %>%
     filter( n >= !!firm_n)
 }
 
-calculate_LQ <- function(df,...) {
+
+calculate_LQ <- function(df, region, target) {
+  
+  # target <- rlang::enquo(target)
+  # 
   df %>%
-    # 
-    mutate(us_total = sum(n)) %>%
-    group_by(tech_name) %>%
+    {
+      if (region == "msa") group_by(., cbsa_code) 
+      else if (region == "state") group_by(., st_code) 
+      else .
+    } %>%
+    
+    mutate(benchmark_total = sum(n)) %>%
+    group_by(tech_name, add = T) %>%
     mutate(
-      tech_us_total = sum(n),
-      tech_us_share = tech_us_total / us_total
+      tech_benchmark_total = sum(n),
+      tech_benchmark_share = tech_benchmark_total / benchmark_total
     ) %>%
-    group_by(...) %>%
-    mutate(msa_total = sum(n),
-           tech_msa_share = n / msa_total) %>%
+    group_by(!!target) %>%
+    mutate(target_total = sum(n),
+           tech_target_share = n / target_total) %>%
     mutate(
-      lq = tech_msa_share / tech_us_share,
+      lq = tech_target_share / tech_benchmark_share,
       # weigh in absolute size of local cluster
       LQ = lq * n
     ) %>%
