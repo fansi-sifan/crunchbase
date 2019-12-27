@@ -15,29 +15,31 @@ country <- "United%20States"
 type <- "company"
 
 # Get first query result --------------------------------
-# query <- paste0(base,
-#                 "?locations=", country,
-#                 "&organization_types=", type,
-#                 "&user_key=", key)
-#
-# df <- fromJSON(query)
-#
-# # FETCh all data via continuous pagniation -----------------------------
-# while (!is.null(df$data$paging$key_set_url)){
-#
-#   query <- paste0(df$data$paging$key_set_url,"&user_key=",key)
-#   df <- fromJSON(query)
-#   tmp <- bind_rows(tmp,df$data$items$properties %>% as.data.frame())
-#
-#   # print progress
-#   print(nrow(tmp)/df$data$paging$total_items)
-#
-# }
+query <- paste0(base,
+                "?locations=", country,
+                "&organization_types=", type,
+                "&user_key=", key)
+df <- fromJSON(query)
+tmp <- df$data$items$properties %>% as.data.frame()
 
-save(tmp, file = "cb_us_companies.rda")
+# # FETCh all data via continuous pagniation -----------------------------
+while (!is.null(df$data$paging$key_set_url)){
+
+  query <- paste0(df$data$paging$key_set_url,"&user_key=",key)
+  df <- fromJSON(query)
+  tmp <- bind_rows(tmp,df$data$items$properties %>% as.data.frame())
+
+  # print progress
+  print(nrow(tmp)/df$data$paging$total_items)
+
+}
+
+save(tmp, file = "cb_us_companies_122319.rda")
+
 # get details for each organization ------------------------
 # https://api.crunchbase.com/v3.1/organizations/facebook?relationships=funding_rounds,investors&user_key=INSERT_KEY_HERE
-load(file = "cb_us_companies.rda")
+
+# WARNINGS: takes about 50 hours
 
 rel <- "categories,funding_rounds,acquisitions"
 
@@ -84,3 +86,5 @@ for (i in 1:nrow(tmp)) {
   }
   
 }
+
+save(tmp, file = "cb_us_companies_122319_details.rda")
