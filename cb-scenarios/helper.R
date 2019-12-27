@@ -14,18 +14,19 @@ clean_cat <- function(df, min, max) {
     mutate(tech_us_total = dplyr::n()) %>%
     # take out rare or too broad categories
     filter(tech_us_total >= !!min) %>%
-    filter(tech_us_total <= !!max)
+    filter(tech_us_total <= !!max) %>%
+    ungroup()
 }
 
-clean_firms <- function(df, firm_n){
+clean_firms <- function(df, firm_n, ...){
   df %>%
-    group_by(cbsa_code, cbsa_name, cbsa_pop, tech_name) %>%
+    group_by(...) %>%
     summarise(n = n()) %>%   # n = number of companies tagged with each technology in each metro
     ungroup() %>%
     filter( n >= !!firm_n)
 }
 
-calculate_LQ <- function(df) {
+calculate_LQ <- function(df,...) {
   df %>%
     # 
     mutate(us_total = sum(n)) %>%
@@ -34,7 +35,7 @@ calculate_LQ <- function(df) {
       tech_us_total = sum(n),
       tech_us_share = tech_us_total / us_total
     ) %>%
-    group_by(cbsa_code, cbsa_name, cbsa_pop) %>%
+    group_by(...) %>%
     mutate(msa_total = sum(n),
            tech_msa_share = n / msa_total) %>%
     mutate(
@@ -81,7 +82,7 @@ get_SLLQ <- function(df, col, p){
               dplyr::group_map(~ boots(.x,col,p, times = 9), keep = T))
 }
 
-calculate_tci <- function(df, method = "lq") {
+calculate_tci <- function(df, method = "lq", ...) {
   df %>%
     {
       if (method == "SLQ") filter(., SLQ >= z_SLQ) 
@@ -90,7 +91,7 @@ calculate_tci <- function(df, method = "lq") {
     } %>%
     
     # calculate diversity -------
-  group_by(cbsa_name, cbsa_code, cbsa_pop) %>%
+  group_by(...) %>%
     mutate(div = dplyr::n()) %>%
     # calculate ubiquity --------
   group_by(tech_name) %>%
