@@ -3,12 +3,10 @@ library(dplyr)
 library(tidyr)
 library(skimr)
 
-
-
 clean_cols <- function(df) {
   df %>%
     
-    # remove unnecessary folders
+    # remove unnecessary columns
     select(
       permalink, name, city_name, region_name, cat_detail, stock_exchange, stock_symbol,
       founded_year, funding_year, funding_type, isclosed, closed_year
@@ -44,7 +42,7 @@ define_startups <- function(df, start, end, last_fund) {
     # companies that has not gone IPO
     filter(is.na(stock_symbol))
 
-  print(paste0("share of total: ", nrow(temp) / nrow(df)))
+  print(paste0("Sample share of total: ", nrow(temp) / nrow(df)))
   return(temp)
 }
 
@@ -70,34 +68,32 @@ match_place <- function(df) {
   place <- get_place(df)
   load("V:/Sifan/SifanLiu/data/pl2co.rda")
 
-  place.matched <- place %>%
+  place.matched <- p %>%
     left_join(pl2co[c("stpl_fips", "pl_label", "st_name", "stco_code", "afact1", "afact2")],
       by = c("pl_label", "st_name")
     ) %>%
     filter(!is.na(stco_code)) %>%
+    mutate(afact1 = ifelse(is.na(afact1), 1, afact1),
+           afact2 = ifelse(is.na(afact2), 1, afact2))%>%
     group_by(pl_label, st_name) %>%
     # assign place to county with highest afact1 and afact2
     top_n(afact1, n = 1) %>%
     top_n(afact2, n = 1) %>%
-    ungroup()
-
-  place.unmatched <- place %>%
-    left_join(pl2co[c("pl_label", "st_name", "stco_code", "afact1")],
-      by = c("pl_label", "st_name")
-    ) %>%
-    filter(is.na(stco_code)) %>%
-    select(-stco_code) %>%
-    ungroup()
+    ungroup() %>%
+    select(city_name, region_name, pl_label, st_name, stco_code)
+  
+  place.unmatched <- setdiff(place, place.matched %>% select(-stco_code))
 
   return(list(place.matched, place.unmatched))
 }
 
-match_cbsa <- function(){
-  address = companies %>% match_place()
+match_cbsa <- function(df){
+  address = df %>% match_place()
   unmatched = address[[2]]
   
   if (length(unmatched)>0) {
-    print(paste0(length(unmatched), " places unmatched!"))
+    print(paste0(nrow(unmatched), " places unmatched!"))
+    print(unmatched)
     
   }
   

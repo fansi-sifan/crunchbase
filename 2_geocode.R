@@ -1,19 +1,17 @@
 # get a list of places to match --------
 
-unmatched <- unmatched %>%
-  mutate(add = paste0(city_name,", ",region_name))%>%
-  select(-afact1)
+unmatched <- match_place(companies)[[2]] %>%
+  mutate(add = paste0(city_name,", ",region_name))
 
 # GEOCODE=======================================
 # Geocode unmatched use geocoding api ----
-KEY <- Sys.getenv("GOOGLE_MAP_KEY")
+# KEY <- Sys.getenv("GOOGLE_MAP_KEY")
 source("../R/code/add2FIPS.R")
 
-for (i in 6:nrow(unmatched)) {
-  unmatched$stcobk_code[[i]] <- add2FIPS(unmatched$add[[i]], KEY)
+for (i in 1:nrow(unmatched)) {
+  unmatched$stcobk_code[[i]] <- add2FIPS(unmatched$add[[i]])
   
 }
-
 
 # update place list with stco_code -----
 place <- bind_rows(
@@ -32,3 +30,6 @@ pl2co <- bind_rows(
 )
 
 save(pl2co, file = "V:/Sifan/SifanLiu/data/pl2co.rda")
+
+
+
