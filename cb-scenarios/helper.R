@@ -20,10 +20,10 @@ clean_cat <- function(df, min, max) {
 
 clean_firms <- function(df, firm_n, target){
   
-  # target <- rlang::enquo(target)
+  t <- rlang::enquo(target)
   
   df %>%
-    group_by(!!target) %>%
+    group_by(!!t) %>%
     group_by(tech_name, add = T)%>%
     summarise(n = n()) %>%   # n = number of companies tagged with each technology in each metro
     ungroup() %>%
@@ -33,7 +33,7 @@ clean_firms <- function(df, firm_n, target){
 
 calculate_LQ <- function(df, region, target) {
   
-  # target <- rlang::enquo(target)
+  target <- rlang::enquo(target)
   # 
   df %>%
     {

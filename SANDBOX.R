@@ -11,20 +11,32 @@ source("cb-scenarios/helper.R")
 # data analysis =================================
 load("cb-scenarios/data/cb_cbsa.rda")
 
-cb_cbsa %>%
-  # threshold for to qualify
-  clean_cat(min = 10, max = 5000) %>% # remove super rare or super broad categories (software = 4700)
-  clean_firms(firm_n = 4, target = cbsa_code) %>%
+# create a function
+master <- function(min, max, firm_n, target, region){
   
-  # merge
-  left_join(metro.data::county_cbsa_st[c("stco_code", "cbsa_code", "st_code")]) %>%
+  t <- rlang::enquo(target)
   
-  # create indices
-  calculate_LQ(region = "state", target = cbsa_code) %>%    # calculate lq and LQ ( = lq*n) by tech and city
-  calculate_SLQ() %>% # calculate standardized lq and LQ based on distribution
-  ungroup() 
+  cb_cbsa %>%
+    # threshold for to qualify
+    clean_cat(min, max) %>% # remove super rare or super broad categories (software = 4700)
+    clean_firms(firm_n, !!t) %>%
+    
+    # merge
+    left_join(metro.data::county_cbsa_st[c("stco_code", "cbsa_code", "st_code")]) %>%
+    
+    # create indices
+    calculate_LQ(region, !!t) %>%    # calculate lq and LQ ( = lq*n) by tech and city
+    calculate_SLQ() %>% # calculate standardized lq and LQ based on distribution
+    ungroup() 
+  
+}
+
+# test
+
+master(10, 5000, 4, cbsa_code, "state")
+master(10, 5000, 4, stco_code, "msa")
+master(10, 5000, 4, stco_code, "US")
 
 
-#create a function
 
 
