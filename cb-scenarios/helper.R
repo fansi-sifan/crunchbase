@@ -4,6 +4,7 @@ library(visNetwork)
 library(igraph)
 library(dplyr)
 
+# Clean =============================================
 
 clean_cat <- function(df, min, max) {
   df %>%
@@ -30,6 +31,7 @@ clean_firms <- function(df, firm_n, target){
     filter( n >= !!firm_n)
 }
 
+# Find RTA ==================================================
 
 calculate_LQ <- function(df, region, target) {
   
@@ -72,6 +74,30 @@ calculate_SLQ <- function(df) {
 
 }
 
+master <- function(min, max, firm_n, target, region){
+  
+  t <- rlang::enquo(target)
+  
+  cb_cbsa %>%
+    # threshold for to qualify
+    clean_cat(min, max) %>% # remove super rare or super broad categories (software = 4700)
+    clean_firms(firm_n, !!t) %>%
+    
+    # merge
+    left_join(metro.data::county_cbsa_st[c("stco_code", "stco_name","cbsa_code", "cbsa_name","st_code","st_name")]) %>%
+    
+    # create indices
+    calculate_LQ(region, !!t) %>%    # calculate lq and LQ ( = lq*n) by tech and city
+    calculate_SLQ() %>% # calculate standardized lq and LQ based on distribution
+    ungroup() %>%
+    select(!!t, cbsa_code,cbsa_name, st_code, st_name,tech_name, n, tech_benchmark_total, tech_benchmark_share, target_total, benchmark_total, 
+           tech_target_share, lq, LQ, SLQ, slq) %>%
+    unique()
+  
+}
+
+# Complexity analysis ===================================
+
 get_zscore <- function(df, col, p){
   quantile(as.data.frame(df)[[col]], probs = p)
 }
@@ -95,7 +121,10 @@ get_SLLQ <- function(df, col, p){
               dplyr::group_map(~ boots(.x,col,p, times = 9), keep = T))
 }
 
-calculate_tci <- function(df, method = "lq", ...) {
+calculate_tci <- function(df, method = "lq", target) {
+  
+  target <- rlang::enquo(target)
+  
   df %>%
     {
       if (method == "SLQ") filter(., SLQ >= z_SLQ) 
@@ -104,7 +133,7 @@ calculate_tci <- function(df, method = "lq", ...) {
     } %>%
     
     # calculate diversity -------
-  group_by(...) %>%
+  group_by(!!target) %>%
     mutate(div = dplyr::n()) %>%
     # calculate ubiquity --------
   group_by(tech_name) %>%
