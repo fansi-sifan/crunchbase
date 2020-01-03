@@ -23,5 +23,6 @@ cb_cbsa <- companies %>%
   left_join(matched, by = c("city_name", "region_name"))
 # save(cb_cbsa, file = "cb-scenarios/data/cb_cbsa.rda")
 
-cb_cbsa %>%
-  filter(is.na(stco_code)) 
+skim(cb_cbsa)
+
+save(cb_cbsa, file = "cb-scenarios/data/cb_cbsa.rda")

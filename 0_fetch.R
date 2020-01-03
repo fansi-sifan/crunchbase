@@ -97,4 +97,4 @@ for (i in 1:nrow(tmp)) {
   
 }
 
-save(tmp, file = "cb_us_companies_122319_details.rda")
+save(tmp, file = "cb_us_companies_122319_detail.rda")

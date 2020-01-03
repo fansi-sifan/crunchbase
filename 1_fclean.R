@@ -9,12 +9,18 @@ clean_cols <- function(df) {
     # remove unnecessary columns
     select(
       permalink, name, city_name, region_name, cat_detail, stock_exchange, stock_symbol,
-      founded_year, funding_year, funding_type, isclosed, closed_year
+      founded_year, funding_year, funding_type, isclosed, closed_year, founder_gender, founder_firstname, founder_lastname
     ) %>%
     
     # get latest funding year and type
     separate(funding_type, "funding_type_latest", sep = ",", remove = F, extra = "drop", fill = "left") %>%
     separate(funding_year, "funding_year_latest", sep = ",", remove = F, extra = "drop", fill = "left") %>%
+    
+    # check if any of the founders are female
+    mutate(founder_gender = case_when(
+      grepl("Female",founder_gender) ~ T,
+      is.na(founder_gender) ~ NA,
+      TRUE ~ F))%>%
     
     # parse year
     mutate(
@@ -68,7 +74,7 @@ match_place <- function(df) {
   place <- get_place(df)
   load("V:/Sifan/SifanLiu/data/pl2co.rda")
 
-  place.matched <- p %>%
+  place.matched <- place %>%
     left_join(pl2co[c("stpl_fips", "pl_label", "st_name", "stco_code", "afact1", "afact2")],
       by = c("pl_label", "st_name")
     ) %>%
