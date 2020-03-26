@@ -32,7 +32,7 @@ clean_cols <- function(df) {
 define_startups <- function(df, start, end, last_fund) {
   temp <- df %>%
     # companies that are still operating
-    filter(isclosed == FALSE) %>%
+    filter(isclosed == "FALSE") %>%
     # year companies founded
     filter(year_founded > start & year_founded < end) %>%
     # companies received at least one funding
@@ -65,10 +65,10 @@ get_place <- function(df) {
 match_place <- function(df) {
   # match the places using pl2co crosswalk
   
-  place <- get_place(df)
-  load("V:/Sifan/SifanLiu/data/pl2co.rda")
+  
+  load("../SifanLiu/data/pl2co.rda")
 
-  place.matched <- p %>%
+  place.matched <- df %>%
     left_join(pl2co[c("stpl_fips", "pl_label", "st_name", "stco_code", "afact1", "afact2")],
       by = c("pl_label", "st_name")
     ) %>%
@@ -82,14 +82,14 @@ match_place <- function(df) {
     ungroup() %>%
     select(city_name, region_name, pl_label, st_name, stco_code)
   
-  place.unmatched <- setdiff(place, place.matched %>% select(-stco_code))
+  place.unmatched <- dplyr::setdiff(df, place.matched %>% select(-stco_code))
 
   return(list(place.matched, place.unmatched))
 }
 
 match_cbsa <- function(df){
-  address = df %>% match_place()
-  unmatched = address[[2]]
+  
+  unmatched = df[[2]]
   
   if (length(unmatched)>0) {
     print(paste0(nrow(unmatched), " places unmatched!"))
@@ -97,7 +97,7 @@ match_cbsa <- function(df){
     
   }
   
-  matched = address[[1]] %>%
+  matched = df[[1]] %>%
     left_join(metro.data::county_cbsa_st, by = "stco_code") %>%
     select(city_name, region_name, stco_code, cbsa_code, cbsa_name, cbsa_pop) %>%
     unique()

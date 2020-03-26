@@ -14,7 +14,12 @@ companies <- tmp %>%
 # define_startups(start = 1999, end = 2008, last_fund = 2003)
 
 # get geo matching result --------------------
-matched <- match_cbsa(companies)
+matched <- companies %>% 
+  ungroup() %>%
+  get_place() %>%
+  match_place() %>%
+  match_cbsa()
+
 # if many unmatched, use geocoding api
 # source("../R/code/add2FIPS.R")
 
