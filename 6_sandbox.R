@@ -1,6 +1,6 @@
 # group by category --------------------------
-library(dplyr)
-library(readr)
+library(tidyverse)
+
 cat <- read_csv("data/categories-6-12-2019.csv") 
 
 cat_token <- cat %>%
@@ -14,10 +14,15 @@ t <- final %>% left_join(cat_token, by = "tech_name")
 
 # analyze startups by sectors ------
 t %>%
-  filter(grepl("health care|biotechnology", tech_group)) %>%
-  group_by(cbsa_code, cbsa_name, cbsa_pop)%>%
+  filter(grepl("health care|biotechnology", tech_group)) %>% 
+  group_by(cbsa_code, cbsa_name, cbsa_pop, msa_total, us_total)%>%
   filter(!is.na(cbsa_code))%>%
-  summarise(firm = sum(n))
+  summarise(firm = sum(n)) %>% 
+  ungroup() %>% 
+  mutate(health_us_total = sum(firm),
+         health_pct = firm/msa_total,
+         health_lq = health_pct/(health_us_total/us_total)) %>% 
+  write.csv("cb_health cluster.csv")
 
 
 t %>%
